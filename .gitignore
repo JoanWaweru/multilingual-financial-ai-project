@@ -1,0 +1,53 @@
+# Environment
+.env
+venv/
+env/
+ENV/
+*.pyc
+__pycache__/
+
+# Data files (too large)
+data/raw/
+data/processed/
+data/annotations/
+data/splits/
+
+# Models (too large)
+saved_models/*.pt
+saved_models/*.pkl
+saved_models/*.pth
+
+# Logs
+logs/
+*.log
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Results
+results/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.bak
+*.cache
+
+# Keep directory structure
+!data/.gitkeep
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!saved_models/.gitkeep
+!logs/.gitkeep
+!results/.gitkeep
