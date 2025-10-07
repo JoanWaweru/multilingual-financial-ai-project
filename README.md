@@ -15,3 +15,32 @@ This project develops deep learning models for detecting and analyzing code-swit
 - 📈 Engagement analysis and A/B testing
 
 ## Project Structure
+multilingual_finance_chatbot/
+├── data/                    # Datasets
+├── data_acquisition/        # Download scripts
+├── preprocessing/           # Data cleaning
+├── models/                  # Model definitions
+├── training/               # Training scripts
+├── chatbot/                # Chatbot implementation
+├── web_app/                # Streamlit interface
+└── results/                # Outputs
+
+## Installation
+```bash
+# Clone repository
+git clone [your-repo-url]
+cd multilingual_finance_chatbot
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Download spaCy models
+python -m spacy download en_core_web_sm
+
+# Setup environment variables
+cp .env.example .env
+# Edit .env with your API keys
