@@ -1,117 +1,235 @@
+"""
+Train BERT-based code-switching detector
+"""
+
 import torch
-import pandas as pd
+import torch.nn as nn
+from torch.utils.data import DataLoader
+from transformers import BertTokenizer, AdamW, get_linear_schedule_with_warmup
 from pathlib import Path
 import logging
-from datetime import datetime
+from tqdm import tqdm
+import json
 
-from models.code_switching_detector import BERTCodeSwitchingDetector, CodeSwitchingTrainer
-from config.settings import PROCESSED_DATA_DIR, MODELS_DIR, MODEL_CONFIG
+from training.model import BERTCodeSwitchingModel
+from training.dataset import create_dataloaders
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def train_code_switching_detector(
-    data_file: str = "tweets_analyzed.csv",
-    balance_data: bool = True,
-    sample_size: int = 10000,
-    save_model: bool = True
-):
-    """
-    Main training function for code-switching detector
+class Trainer:
+    """Trainer for code-switching detection"""
     
-    Args:
-        data_file: Name of the data file in PROCESSED_DATA_DIR
-        balance_data: Whether to balance the dataset
-        sample_size: Maximum samples per class
-        save_model: Whether to save the trained model
-    
-    Returns:
-        Trained model and evaluation metrics
-    """
-    
-    print("\n" + "="*70)
-    print("TRAINING CODE-SWITCHING DETECTOR")
-    print("="*70)
-    
-    # Load data
-    logger.info(f"Loading data from {data_file}...")
-    df = pd.read_csv(PROCESSED_DATA_DIR / data_file)
-    logger.info(f"Loaded {len(df)} tweets")
-    
-    # Balance dataset
-    if balance_data:
-        logger.info("Balancing dataset...")
-        code_switched = df[df['has_code_switching'] == True]
-        non_code_switched = df[df['has_code_switching'] == False]
+    def __init__(self, model, train_loader, val_loader, device, 
+                 learning_rate=2e-5, num_epochs=5):
         
-        # Sample to balance
-        n_samples = min(len(code_switched), len(non_code_switched), sample_size)
+        self.model = model.to(device)
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        self.device = device
+        self.num_epochs = num_epochs
         
-        code_switched_sample = code_switched.sample(n=n_samples, random_state=42)
-        non_code_switched_sample = non_code_switched.sample(n=n_samples, random_state=42)
+        # Optimizer
+        self.optimizer = AdamW(model.parameters(), lr=learning_rate)
         
-        df = pd.concat([code_switched_sample, non_code_switched_sample])
-        df = df.sample(frac=1, random_state=42).reset_index(drop=True)
+        # Scheduler
+        total_steps = len(train_loader) * num_epochs
+        self.scheduler = get_linear_schedule_with_warmup(
+            self.optimizer,
+            num_warmup_steps=500,
+            num_training_steps=total_steps
+        )
         
-        logger.info(f"Balanced dataset: {len(df)} tweets")
-        logger.info(f"  Code-switched: {df['has_code_switching'].sum()}")
-        logger.info(f"  Non code-switched: {(~df['has_code_switching']).sum()}")
+        # Loss function
+        self.criterion = nn.CrossEntropyLoss()
+        
+        # Tracking
+        self.best_val_loss = float('inf')
+        self.training_stats = []
     
-    # Initialize model
-    logger.info("Initializing BERT model...")
-    model = BERTCodeSwitchingDetector(n_classes=2)
-    trainer = CodeSwitchingTrainer(model)
+    def train_epoch(self, epoch):
+        """Train for one epoch"""
+        
+        self.model.train()
+        total_loss = 0
+        correct = 0
+        total = 0
+        
+        progress_bar = tqdm(self.train_loader, desc=f"Epoch {epoch+1}/{self.num_epochs}")
+        
+        for batch in progress_bar:
+            # Move to device
+            input_ids = batch['input_ids'].to(self.device)
+            attention_mask = batch['attention_mask'].to(self.device)
+            labels = batch['labels'].to(self.device)
+            
+            # Forward pass
+            self.optimizer.zero_grad()
+            logits = self.model(input_ids, attention_mask)
+            loss = self.criterion(logits, labels)
+            
+            # Backward pass
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+            self.optimizer.step()
+            self.scheduler.step()
+            
+            # Track metrics
+            total_loss += loss.item()
+            predictions = torch.argmax(logits, dim=1)
+            correct += (predictions == labels).sum().item()
+            total += labels.size(0)
+            
+            # Update progress bar
+            progress_bar.set_postfix({
+                'loss': loss.item(),
+                'acc': correct/total
+            })
+        
+        avg_loss = total_loss / len(self.train_loader)
+        accuracy = correct / total
+        
+        return avg_loss, accuracy
     
-    # Prepare data
-    logger.info("Preparing dataloaders...")
-    train_loader, val_loader, test_loader = trainer.prepare_data(df)
+    def validate(self):
+        """Validate model"""
+        
+        self.model.eval()
+        total_loss = 0
+        correct = 0
+        total = 0
+        
+        with torch.no_grad():
+            for batch in tqdm(self.val_loader, desc="Validating"):
+                input_ids = batch['input_ids'].to(self.device)
+                attention_mask = batch['attention_mask'].to(self.device)
+                labels = batch['labels'].to(self.device)
+                
+                logits = self.model(input_ids, attention_mask)
+                loss = self.criterion(logits, labels)
+                
+                total_loss += loss.item()
+                predictions = torch.argmax(logits, dim=1)
+                correct += (predictions == labels).sum().item()
+                total += labels.size(0)
+        
+        avg_loss = total_loss / len(self.val_loader)
+        accuracy = correct / total
+        
+        return avg_loss, accuracy
     
-    # Train
-    print("\n" + "-"*70)
-    print("TRAINING")
-    print("-"*70)
+    def train(self):
+        """Complete training loop"""
+        
+        logger.info("=" * 60)
+        logger.info("STARTING TRAINING")
+        logger.info("=" * 60)
+        
+        for epoch in range(self.num_epochs):
+            # Train
+            train_loss, train_acc = self.train_epoch(epoch)
+            
+            # Validate
+            val_loss, val_acc = self.validate()
+            
+            # Log
+            logger.info(f"\nEpoch {epoch+1}/{self.num_epochs}")
+            logger.info(f"  Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
+            logger.info(f"  Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}")
+            
+            # Save stats
+            self.training_stats.append({
+                'epoch': epoch + 1,
+                'train_loss': train_loss,
+                'train_acc': train_acc,
+                'val_loss': val_loss,
+                'val_acc': val_acc
+            })
+            
+            # Save best model
+            if val_loss < self.best_val_loss:
+                self.best_val_loss = val_loss
+                self.save_model('best_model.pt')
+                logger.info(f"  ✓ Saved best model (val_loss: {val_loss:.4f})")
+        
+        logger.info("\n" + "=" * 60)
+        logger.info("TRAINING COMPLETE!")
+        logger.info("=" * 60)
+        
+        return self.training_stats
     
-    trainer.train(train_loader, val_loader, epochs=MODEL_CONFIG['num_epochs'])
-    
-    # Test
-    print("\n" + "-"*70)
-    print("TESTING")
-    print("-"*70)
-    
-    import torch.nn as nn
-    test_acc, test_loss = trainer.evaluate(test_loader, nn.CrossEntropyLoss())
-    
-    print(f"\nFinal Test Accuracy: {test_acc:.2f}%")
-    print(f"Final Test Loss: {test_loss:.4f}")
-    
-    # Save model
-    if save_model:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        model_name = f"code_switching_detector_{timestamp}.pt"
-        trainer.save_model(model_name)
-        logger.info(f"Model saved as {model_name}")
-    
-    results = {
-        "test_accuracy": test_acc,
-        "test_loss": test_loss,
-        "train_size": len(train_loader.dataset),
-        "val_size": len(val_loader.dataset),
-        "test_size": len(test_loader.dataset)
-    }
-    
-    return trainer, results
+    def save_model(self, filename):
+        """Save model checkpoint"""
+        
+        models_dir = Path("saved_models")
+        models_dir.mkdir(exist_ok=True, parents=True)
+        
+        filepath = models_dir / filename
+        
+        torch.save({
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'best_val_loss': self.best_val_loss,
+            'training_stats': self.training_stats
+        }, filepath)
 
-if __name__ == "__main__":
-    trainer, results = train_code_switching_detector(
-        balance_data=True,
-        sample_size=5000,
-        save_model=True
+def main():
+    """Main training function"""
+    
+    # Hyperparameters
+    BATCH_SIZE = 32
+    LEARNING_RATE = 2e-5
+    NUM_EPOCHS = 5
+    MAX_LENGTH = 128
+    
+    # Setup device
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    logger.info(f"Using device: {device}")
+    
+    # Load tokenizer
+    logger.info("Loading tokenizer...")
+    tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased')
+    
+    # Create dataloaders
+    logger.info("Creating dataloaders...")
+    splits_path = Path("data/splits")
+    
+    train_file = splits_path / "train_processed.csv"
+    val_file = splits_path / "val_processed.csv"
+    test_file = splits_path / "test_processed.csv"
+    
+    # Check if processed files exist, otherwise use original
+    if not train_file.exists():
+        train_file = splits_path / "train.csv"
+        val_file = splits_path / "val.csv"
+        test_file = splits_path / "test.csv"
+    
+    train_loader, val_loader, test_loader = create_dataloaders(
+        train_file, val_file, test_file,
+        tokenizer, batch_size=BATCH_SIZE, max_length=MAX_LENGTH
     )
     
-    print("\n" + "="*70)
-    print("TRAINING COMPLETE")
-    print("="*70)
-    print(f"Test Accuracy: {results['test_accuracy']:.2f}%")
-    print(f"Dataset sizes:")
-    print(f"  Train: {results['train_size']}")
-    print(f"  Validation: {results['val_size']}")
-    print(f"  Test: {results['test_size']}")
+    # Create model
+    logger.info("Creating model...")
+    model = BERTCodeSwitchingModel(num_labels=3, dropout=0.1)
+    
+    # Create trainer
+    trainer = Trainer(
+        model, train_loader, val_loader, device,
+        learning_rate=LEARNING_RATE, num_epochs=NUM_EPOCHS
+    )
+    
+    # Train
+    stats = trainer.train()
+    
+    # Save final stats
+    results_dir = Path("results/training")
+    results_dir.mkdir(exist_ok=True, parents=True)
+    
+    with open(results_dir / "training_stats.json", 'w') as f:
+        json.dump(stats, f, indent=2)
+    
+    logger.info(f"\n✓ Training stats saved to: {results_dir}/training_stats.json")
+
+if __name__ == "__main__":
+    main()
