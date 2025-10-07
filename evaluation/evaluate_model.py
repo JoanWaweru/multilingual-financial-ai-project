@@ -97,29 +97,32 @@ def main():
     logger.info(f"Test Accuracy: {test_acc:.4f} ({test_acc*100:.2f}%)")
     
     # Classification report
-    label_names = ['English/Non-CS', 'Swahili', 'Code-Switched']
+    label_names_full = ['English/Non-CS', 'Swahili', 'Code-Switched']
+    present_label_ids = sorted(list(set(labels) | set(predictions)))
+    target_names = [label_names_full[i] for i in present_label_ids]
     
     logger.info("\n" + "=" * 70)
     logger.info(" 📈 CLASSIFICATION REPORT")
     logger.info("=" * 70)
-    print(classification_report(labels, predictions, target_names=label_names, digits=4))
+    print(classification_report(labels, predictions, labels=present_label_ids, target_names=target_names, digits=4))
     
     # Confusion matrix
     logger.info("\n" + "=" * 70)
     logger.info(" 🔢 CONFUSION MATRIX")
     logger.info("=" * 70)
-    cm = confusion_matrix(labels, predictions)
+    cm = confusion_matrix(labels, predictions, labels=present_label_ids)
     print("\n", cm)
     print("\nRows: True labels | Columns: Predictions")
-    print(f"Labels: {label_names}")
+    print(f"Labels: {target_names}")
     
     # Check class distribution
     logger.info("\n" + "=" * 70)
     logger.info(" 📊 CLASS DISTRIBUTION")
     logger.info("=" * 70)
     unique, counts = np.unique(labels, return_counts=True)
+    name_by_id = {i: label_names_full[i] for i in range(len(label_names_full))}
     for label_id, count in zip(unique, counts):
-        logger.info(f"  {label_names[label_id]}: {count} samples ({count/len(labels)*100:.1f}%)")
+        logger.info(f"  {name_by_id.get(label_id, str(label_id))}: {count} samples ({count/len(labels)*100:.1f}%)")
     
     # Save results
     results_dir = Path("results/evaluation")
@@ -128,11 +131,17 @@ def main():
     results = {
         'test_loss': float(test_loss),
         'test_accuracy': float(test_acc),
-        'classification_report': classification_report(labels, predictions, 
-                                                       target_names=label_names, 
-                                                       output_dict=True),
+        'labels_used': target_names,
+        'label_ids': [int(i) for i in present_label_ids],
+        'classification_report': classification_report(
+            labels,
+            predictions,
+            labels=present_label_ids,
+            target_names=target_names,
+            output_dict=True
+        ),
         'confusion_matrix': cm.tolist(),
-        'class_distribution': {label_names[i]: int(c) for i, c in zip(unique, counts)}
+        'class_distribution': {name_by_id.get(i, str(i)): int(c) for i, c in zip(unique, counts)}
     }
     
     with open(results_dir / "test_results.json", 'w') as f:
