@@ -1,239 +1,185 @@
-from transformers import GPT2LMHeadModel, GPT2Tokenizer
-import torch
-from typing import List, Dict, Optional
+"""
+Adaptive response generator with code-switching
+"""
+
 import random
-import logging
-
-from config.settings import CHATBOT_CONFIG, MODELS_DIR
-
-logger = logging.getLogger(__name__)
+from chatbot.knowledge.kenyan_phrases import KenyanPhrases
 
 class ResponseGenerator:
-    """Generate code-switched financial responses"""
+    """Generate responses with adaptive code-switching"""
     
-    def __init__(self, model_name: str = "microsoft/DialoGPT-small"):
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        logger.info(f"Using device: {self.device}")
+    def __init__(self):
+        self.phrases = KenyanPhrases()
         
-        try:
-            self.tokenizer = GPT2Tokenizer.from_pretrained(model_name)
-            self.model = GPT2LMHeadModel.from_pretrained(model_name).to(self.device)
-            
-            # Set pad token
-            self.tokenizer.pad_token = self.tokenizer.eos_token
-            self.model.config.pad_token_id = self.tokenizer.eos_token_id
-            
-            logger.info(f"✓ Loaded model: {model_name}")
-        except Exception as e:
-            logger.error(f"Error loading model: {e}")
-            raise
-        
-        # Financial response templates
-        self.templates = {
-            "savings": [
-                "To save money effectively, {advice}. Kama wanavyosema, akiba haiozi!",
-                "Savings ni muhimu sana. {advice}. Start small, even 500 KES helps.",
-                "Here's a savings tip: {advice}. Consistency is key!"
-            ],
-            "investment": [
-                "For investment, {advice}. Remember: usifte mayai yako kwenye kikapu kimoja!",
-                "Investment strategy: {advice}. Diversification ni muhimu.",
-                "Consider this investment approach: {advice}. Think long-term!"
-            ],
-            "budget": [
-                "Budgeting tips: {advice}. Track kila expense to understand your spending.",
-                "For better budget management: {advice}. Use the 50/30/20 rule.",
-                "Budget advice: {advice}. Discipline inaleta freedom!"
-            ],
-            "mpesa": [
-                "About M-Pesa: {advice}. It's safe na convenient for daily transactions.",
-                "M-Pesa tips: {advice}. Always confirm details kabla ya sending pesa.",
-                "Using mobile money: {advice}. Keep your PIN secret!"
-            ]
-        }
-    
-    def generate_response(self, user_message: str, context: List[str] = None, 
-                         code_switching_level: str = "balanced") -> str:
-        """Generate response with code-switching"""
-        
-        if context is None:
-            context = []
-        
-        # Check for template-based responses first
-        template_response = self.get_template_response(user_message)
-        if template_response:
-            return self.apply_code_switching(template_response, code_switching_level)
-        
-        try:
-            # Build conversation history
-            conversation = context + [user_message]
-            input_text = " ".join(conversation[-CHATBOT_CONFIG['max_history']:])
-            
-            # Encode
-            input_ids = self.tokenizer.encode(
-                input_text + self.tokenizer.eos_token, 
-                return_tensors='pt'
-            ).to(self.device)
-            
-            # Generate with sampling
-            with torch.no_grad():
-                output = self.model.generate(
-                    input_ids,
-                    max_length=min(input_ids.shape[1] + CHATBOT_CONFIG['response_max_length'], 512),
-                    temperature=CHATBOT_CONFIG['temperature'],
-                    top_p=0.9,
-                    top_k=50,
-                    do_sample=True,
-                    pad_token_id=self.tokenizer.eos_token_id,
-                    no_repeat_ngram_size=3
-                )
-            
-            # Decode
-            response = self.tokenizer.decode(
-                output[0][input_ids.shape[1]:], 
-                skip_special_tokens=True
-            )
-            
-            # Apply code-switching
-            response = self.apply_code_switching(response, code_switching_level)
-            
-            return response.strip()
-            
-        except Exception as e:
-            logger.error(f"Error generating response: {e}")
-            return self.get_fallback_response(user_message)
-    
-    def get_template_response(self, message: str) -> Optional[str]:
-        """Get template-based response for common queries"""
-        message_lower = message.lower()
-        
-        # Detect topic and generate appropriate response
-        if any(word in message_lower for word in ['save', 'saving', 'akiba']):
-            advice = random.choice([
-                "start by setting aside at least 10% of your income",
-                "automate your savings through standing orders",
-                "join a chama or savings group for accountability"
-            ])
-            return random.choice(self.templates['savings']).format(advice=advice)
-        
-        elif any(word in message_lower for word in ['invest', 'investment', 'uwekezaji', 'hisa']):
-            advice = random.choice([
-                "consider index funds for steady long-term growth",
-                "start with government bonds if you're risk-averse",
-                "diversify across stocks, bonds, and real estate"
-            ])
-            return random.choice(self.templates['investment']).format(advice=advice)
-        
-        elif any(word in message_lower for word in ['budget', 'bajeti', 'plan']):
-            advice = random.choice([
-                "list all income sources and expenses",
-                "use the 50/30/20 rule: 50% needs, 30% wants, 20% savings",
-                "track every shilling for at least one month"
-            ])
-            return random.choice(self.templates['budget']).format(advice=advice)
-        
-        elif any(word in message_lower for word in ['mpesa', 'm-pesa', 'mobile money']):
-            advice = random.choice([
-                "use M-Pesa for quick transfers but watch the transaction fees",
-                "link your M-Pesa to a savings account for better interest",
-                "always verify recipient details before sending money"
-            ])
-            return random.choice(self.templates['mpesa']).format(advice=advice)
-        
-        return None
-    
-    def apply_code_switching(self, text: str, level: str = "balanced") -> str:
-        """Apply code-switching patterns to text"""
-        
-        # Swahili translations for financial terms
-        translations = {
+        # Swahili financial terms
+        self.swahili_terms = {
             'money': 'pesa',
-            'savings': 'akiba',
-            'save': 'hifadhi',
-            'loan': 'mkopo',
-            'budget': 'bajeti',
-            'business': 'biashara',
             'bank': 'benki',
+            'save': 'weka',
+            'savings': 'akiba',
+            'loan': 'mkopo',
+            'account': 'akaunti',
             'investment': 'uwekezaji',
-            'invest': 'wekeza',
-            'income': 'mapato',
-            'expense': 'matumizi',
-            'profit': 'faida',
-            'loss': 'hasara',
-            'interest': 'riba',
-            'account': 'akaunti'
+            'budget': 'bajeti',
+            'payment': 'malipo',
+            'interest': 'riba'
         }
-        
-        # Swahili connectors and fillers
-        connectors = {
-            'and': 'na',
-            'or': 'au',
-            'but': 'lakini',
-            'also': 'pia',
-            'very': 'sana',
-            'just': 'tu',
-            'only': 'tu'
-        }
-        
-        words = text.split()
-        switched_words = []
-        
-        for word in words:
-            word_lower = word.lower().strip('.,!?')
-            
-            if level == "high":
-                # More Swahili mixing
-                if word_lower in translations and random.random() > 0.3:
-                    switched_words.append(translations[word_lower])
-                elif word_lower in connectors and random.random() > 0.4:
-                    switched_words.append(connectors[word_lower])
-                else:
-                    switched_words.append(word)
-            
-            elif level == "balanced":
-                # Balanced mixing
-                if word_lower in translations and random.random() > 0.6:
-                    switched_words.append(translations[word_lower])
-                elif word_lower in connectors and random.random() > 0.7:
-                    switched_words.append(connectors[word_lower])
-                else:
-                    switched_words.append(word)
-            
-            else:  # level == "low"
-                # Minimal mixing - just occasional Swahili
-                if word_lower in translations and random.random() > 0.85:
-                    switched_words.append(translations[word_lower])
-                else:
-                    switched_words.append(word)
-        
-        return " ".join(switched_words)
     
-    def get_fallback_response(self, message: str) -> str:
-        """Fallback response when generation fails"""
-        fallbacks = [
-            "That's an interesting question about pesa! Could you tell me more?",
-            "I understand you're asking about finances. Let me help - can you be more specific?",
-            "Pole, I didn't quite get that. Could you rephrase your question about savings, investment, or budgeting?",
-            "Interesting! Tell me more about what financial topic you'd like to discuss."
+    def generate_response(self, knowledge_result, user_language_pattern, 
+                         include_proverb=False):
+        """
+        Generate response matching user's language pattern
+        
+        Args:
+            knowledge_result: Dict with 'answer', 'category', etc.
+            user_language_pattern: Dict with 'label' and 'swahili_ratio'
+            include_proverb: Whether to add a proverb
+        
+        Returns:
+            str: Generated response
+        """
+        
+        if not knowledge_result:
+            return self._generate_fallback_response(user_language_pattern)
+        
+        # Start with greeting/transition
+        response = self._add_greeting(user_language_pattern)
+        
+        # Get base answer
+        base_answer = knowledge_result['answer']
+        
+        # Adapt answer based on user's language pattern
+        adapted_answer = self._adapt_language(
+            base_answer,
+            user_language_pattern
+        )
+        
+        response += " " + adapted_answer
+        
+        # Add encouragement
+        if random.random() < 0.5:
+            response += f" {self.phrases.get_encouragement()}"
+        
+        # Add proverb if requested
+        if include_proverb and random.random() < 0.7:
+            proverb = self.phrases.get_random_proverb()
+            response += f"\n\n💡 Remember: \"{proverb['swahili']}\" ({proverb['english']}) - {proverb['meaning']}"
+        
+        return response
+    
+    def _add_greeting(self, language_pattern):
+        """Add appropriate greeting based on language pattern"""
+        
+        swahili_ratio = language_pattern.get('swahili_ratio', 0.5)
+        
+        if swahili_ratio > 0.6:
+            return self.phrases.get_transition()  # "Sawa," "Poa,"
+        elif swahili_ratio < 0.3:
+            return random.choice(['Okay,', 'Alright,', 'Sure,'])
+        else:
+            return self.phrases.get_transition()
+    
+    def _adapt_language(self, text, language_pattern):
+        """
+        Adapt response language to match user's pattern
+        
+        Simple approach: Mix in Swahili terms based on user's ratio
+        """
+        
+        swahili_ratio = language_pattern.get('swahili_ratio', 0.5)
+        label = language_pattern.get('label', 'english')
+        
+        # If user speaks mostly Swahili or code-switches, add Swahili terms
+        if swahili_ratio > 0.4 or label == 'code_switched':
+            # Replace some English terms with Swahili
+            for eng, sw in self.swahili_terms.items():
+                if random.random() < swahili_ratio:
+                    # Replace first occurrence
+                    text = text.replace(eng, sw, 1)
+        
+        return text
+    
+    def _generate_fallback_response(self, language_pattern):
+        """Generate fallback when no knowledge match found"""
+    
+        swahili_ratio = language_pattern.get('swahili_ratio', 0.5)
+    
+        if swahili_ratio > 0.6:
+            responses = [
+            "Pole, sina information hiyo saa hii. But I can help with savings, M-Pesa, loans, chamas, na banking. Try asking about those topics! 😊",
+            "Samahani, sijui about that topic yet. Lakini I know about akiba, M-Pesa, mikopo, chamas na banks. Ask me about those!",
+            "Nimeskia swali lako, but sina answer for that. I can help with savings, loans, M-Pesa, and chamas though. What would you like to know about those?"
         ]
-        return random.choice(fallbacks)
+        elif swahili_ratio < 0.3:
+            responses = [
+            "I don't have that information yet, but I can help with savings, M-Pesa, loans, chamas, and banking. What would you like to know about those topics? 😊",
+            "I'm still learning about that topic! But I'm great with questions about savings, M-Pesa, loans, and chamas. Try asking about those!",
+            "That's a great question, but I don't have that answer yet. I can help with savings accounts, M-Pesa, loans, chamas, and SACCOs though. Interested in any of those?"
+        ]
+        else:
+            responses = [
+            "Pole, I don't have that info yet. But I can help na savings, M-Pesa, loans, chamas, and banking. What would you like to know? 😊",
+            "Samahani, sina answer ya that question. Lakini I know about akiba, M-Pesa, loans, and banks. Ask me something about those!",
+            "Good question! But sina that information. I can help with savings, M-Pesa, mikopo, chamas na banking though. Try asking about those topics!"
+        ]
+    
+        return random.choice(responses)
+    
+    def generate_welcome_message(self):
+        """Generate welcome message"""
+        
+        return """Habari! Welcome to the Kenyan Financial Advisor chatbot. 🇰🇪
+
+I can help you with:
+💰 Savings and akiba
+📱 M-Pesa and mobile money
+🏦 Banking and bank accounts
+💵 Loans and mikopo
+👥 Chamas and SACCOs
+📊 Budgeting and planning
+
+Feel free to ask in English, Swahili, or mix them (code-switching)! 
+
+What would you like to know? 😊"""
 
 if __name__ == "__main__":
-    # Test the generator
+    # Test response generator
     generator = ResponseGenerator()
     
-    test_messages = [
-        "How can I save money?",
-        "Tell me about investment",
-        "I want to create a budget",
-        "What is M-Pesa?"
+    print("\n" + "=" * 60)
+    print("TESTING RESPONSE GENERATOR")
+    print("=" * 60)
+    
+    # Test with different language patterns
+    test_cases = [
+        {
+            'knowledge': {
+                'answer': 'You can save money by opening a bank account at Equity or KCB.',
+                'category': 'savings'
+            },
+            'pattern': {
+                'label': 'code_switched',
+                'swahili_ratio': 0.6
+            }
+        },
+        {
+            'knowledge': {
+                'answer': 'M-Pesa allows you to send money using your phone.',
+                'category': 'mpesa'
+            },
+            'pattern': {
+                'label': 'english',
+                'swahili_ratio': 0.2
+            }
+        }
     ]
     
-    print("\n" + "="*70)
-    print("TESTING RESPONSE GENERATOR")
-    print("="*70)
-    
-    for msg in test_messages:
-        print(f"\nUser: {msg}")
-        response = generator.generate_response(msg, code_switching_level="balanced")
-        print(f"Bot: {response}")
+    for i, case in enumerate(test_cases, 1):
+        print(f"\nTest {i}:")
+        print(f"  Pattern: {case['pattern']['label']}, Swahili: {case['pattern']['swahili_ratio']:.0%}")
+        response = generator.generate_response(
+            case['knowledge'],
+            case['pattern'],
+            include_proverb=True
+        )
+        print(f"  Response: {response}")
