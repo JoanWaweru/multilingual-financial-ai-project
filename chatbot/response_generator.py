@@ -1,11 +1,12 @@
 """
-Enhanced Response Generator with Conversational Intelligence
-Handles code-switching, context awareness, and natural dialogue
+Production-Grade Response Generator
+Handles ALL conversation scenarios with context awareness
 """
 
 import sys
 from pathlib import Path
 import random
+import logging
 
 # Fix imports
 try:
@@ -20,13 +21,21 @@ except ModuleNotFoundError:
     from chatbot.utils.intent_analyzer import IntentAnalyzer
     from chatbot.utils.dynamic_advisor import DynamicFinancialAdvisor
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 class ResponseGenerator:
     """
-    Generate responses with:
-    - Adaptive code-switching
-    - Conversational context awareness
-    - Option selection handling
-    - Follow-up question support
+    Complete response generation system
+    
+    Handles:
+    - Conversational context
+    - Follow-up questions
+    - Option selections
+    - Affirmations (yes/no)
+    - Return calculations
+    - Short queries
+    - Code-switching
     - Live data integration
     """
     
@@ -35,7 +44,7 @@ class ResponseGenerator:
         self.intent_analyzer = IntentAnalyzer()
         self.advisor = DynamicFinancialAdvisor()
         
-        # Swahili financial terms for code-switching
+        # Swahili financial terms
         self.swahili_terms = {
             'money': 'pesa',
             'bank': 'benki',
@@ -44,324 +53,556 @@ class ResponseGenerator:
             'loan': 'mkopo',
             'account': 'akaunti',
             'investment': 'uwekezaji',
-            'budget': 'bajeti',
-            'payment': 'malipo',
-            'interest': 'riba',
             'profit': 'faida',
-            'returns': 'mapato'
+            'returns': 'mapato',
+            'interest': 'riba'
         }
     
     def generate_conversational_response(self, user_query, analysis, context, live_data, language_pattern):
         """
-        Generate conversational response that adapts to dialogue flow
+        MAIN CONVERSATIONAL ROUTING
         
-        This is the KEY method that makes the chatbot feel conversational!
+        This is the BRAIN of conversational flow
+        Handles ALL context-aware responses
         
-        Args:
-            user_query: User's message
-            analysis: Intent analysis result
-            context: Conversation context
-            live_data: Live market data
-            language_pattern: Detected language pattern
-        
-        Returns:
-            str: Conversational response or None (fall through)
+        Priority Order:
+        1. Affirmations (yes/no)
+        2. Option selections (1, 2, 3)
+        3. Return calculations (follow-up)
+        4. Disagreements (no, but, instead)
+        5. Short follow-ups (context-dependent)
         """
         
         swahili_ratio = language_pattern.get('swahili_ratio', 0.5)
         
-        # Priority 1: Check if user is selecting an option
-        if self._is_option_selection(user_query):
-            return self._handle_option_selection(user_query, context, swahili_ratio)
+        # ================================================================
+        # PRIORITY 1: AFFIRMATIONS (YES/NO)
+        # ================================================================
+        affirmation = context.detect_affirmation(user_query)
+        if affirmation:
+            return self._handle_affirmation(affirmation, context, swahili_ratio)
         
-        # Priority 2: Check if user is disagreeing/rejecting advice
+        # ================================================================
+        # PRIORITY 2: OPTION SELECTION
+        # ================================================================
+        option_num = context.detect_option_selection(user_query)
+        if option_num:
+            return self._handle_option_selection(option_num, context, swahili_ratio, live_data)
+        
+        # ================================================================
+        # PRIORITY 3: RETURN CALCULATION (FOLLOW-UP)
+        # ================================================================
+        if self._is_asking_about_returns(user_query):
+            if context.has_context() and context.last_amount:
+                return self._generate_return_calculation(context, swahili_ratio)
+        
+        # ================================================================
+        # PRIORITY 4: DISAGREEMENT/PREFERENCE CHANGE
+        # ================================================================
         if context.detect_disagreement(user_query):
-            # Learn what they prefer
             context.detect_investment_style_preference(user_query)
             
-            # Generate alternative based on their preference
             if context.user_preferences['investment_style'] == 'single':
-                # User wants ONE place for ALL money
                 return self._generate_single_investment_advice(
+                    analysis['amount'] or context.last_amount,
+                    context,
+                    live_data,
+                    swahili_ratio
+                )
+        
+        # ================================================================
+        # PRIORITY 5: SHORT FOLLOW-UP (USING CONTEXT)
+        # ================================================================
+        if analysis['is_short'] and context.has_context():
+            # Just a number - user answering "how much?"
+            if analysis['amount'] and len(user_query.split()) <= 2:
+                return self._handle_amount_follow_up(
                     analysis['amount'],
                     context,
                     live_data,
                     swahili_ratio
                 )
         
-        # Priority 3: Check for return calculation questions (follow-up)
-        return_keywords = [
-            'how much', 'nitapata', 'return', 'profit', 'expect', 
-            'after', 'year', 'get back', 'returns', 'faida',
-            'mapato', 'calculate', 'total'
-        ]
-        if any(keyword in user_query.lower() for keyword in return_keywords):
-            if context.has_context() and context.last_amount:
-                return self._generate_return_calculation(context, swahili_ratio)
-        
-        # No conversational context detected - return None to use normal flow
+        # No conversational context matched - use normal flow
         return None
     
-    def _is_option_selection(self, user_query: str) -> bool:
-        """
-        Check if user is selecting an option from previous suggestions
-        
-        Detects patterns like:
-        - "option 1", "option 2", "option 3"
-        - "1", "2", "3"
-        - "first option", "second option"
-        - "the first one"
-        """
-        
-        query_lower = user_query.lower().strip()
-        
-        # Check for option patterns
-        option_patterns = [
-            'option 1', 'option 2', 'option 3',
-            'option one', 'option two', 'option three',
-            'first option', 'second option', 'third option',
-            'the first', 'the second', 'the third',
-            'number 1', 'number 2', 'number 3',
-            'choice 1', 'choice 2', 'choice 3'
+    def _is_asking_about_returns(self, user_query: str) -> bool:
+        """Check if asking about returns/profits"""
+        return_keywords = [
+            'how much', 'nitapata', 'return', 'profit', 'expect',
+            'after', 'year', 'get back', 'mapato', 'faida',
+            'calculate', 'total', 'itakuwa', 'will be'
         ]
-        
-        # Short queries that are likely option selections
-        if len(query_lower.split()) <= 3:
-            # Check if it's just a number
-            if query_lower in ['1', '2', '3', 'one', 'two', 'three']:
-                return True
-            
-            # Check option patterns
-            return any(pattern in query_lower for pattern in option_patterns)
-        
-        return False
-    
-    def _handle_option_selection(self, user_query: str, context, swahili_ratio: float) -> str:
-        """
-        Handle when user selects an option
-        
-        Provides detailed information about the selected option
-        """
-        
-        greeting = "Poa!" if swahili_ratio > 0.5 else "Great choice!"
-        
         query_lower = user_query.lower()
+        return any(keyword in query_lower for keyword in return_keywords)
+    
+    def _handle_affirmation(self, affirmation: str, context, swahili_ratio: float) -> str:
+        """
+        Handle YES/NO based on what we last discussed
         
-        # Determine which option
-        if '1' in query_lower or 'first' in query_lower or 'one' in query_lower:
-            option_num = 1
-        elif '2' in query_lower or 'second' in query_lower or 'two' in query_lower:
-            option_num = 2
-        elif '3' in query_lower or 'third' in query_lower or 'three' in query_lower:
-            option_num = 3
+        Looks at conversation history to understand context
+        """
+        
+        logger.info(f"Handling affirmation: {affirmation}")
+        
+        is_yes = (affirmation == 'yes')
+        
+        # Get last exchange
+        last_exchange = context.get_last_exchange()
+        if not last_exchange:
+            return self._generic_affirmation_response(is_yes, swahili_ratio)
+        
+        last_bot = last_exchange['bot'].lower()
+        
+        # ============================================================
+        # CONTEXT 1: CDS Account Help
+        # ============================================================
+        if 'cds' in last_bot and 'help' in last_bot:
+            if is_yes:
+                response = "Poa! " if swahili_ratio > 0.5 else "Great! "
+                response += "Here's how to open a CDS account:\n\n"
+                
+                response += "**OPTION A: Through Your Bank** (Easiest)\n"
+                response += "1. Visit any bank where you have account (Equity, KCB, Co-op)\n"
+                response += "2. Ask: \"I want to open a CDS account\"\n"
+                response += "3. Bring: ID, KRA PIN\n"
+                response += "4. Pay: ~KSh 1,100 registration\n"
+                response += "5. Wait: 1-2 days activation\n\n"
+                
+                response += "**OPTION B: Direct with CBK**\n"
+                response += "1. Go to: centralbank.go.ke\n"
+                response += "2. Download CDS form\n"
+                response += "3. Submit online or visit CBK office\n\n"
+                
+                response += "**💡 Recommendation**: Use your bank - much faster!\n\n"
+                
+                if swahili_ratio > 0.5:
+                    response += "Una account ya bank? 😊"
+                else:
+                    response += "Do you have a bank account? 😊"
+                
+                return response
+            else:
+                if swahili_ratio > 0.5:
+                    return "Sawa, hakuna shida! Kuna kitu kingine ninaweza kukusaidia? 😊"
+                else:
+                    return "No problem! Is there anything else I can help you with? 😊"
+        
+        # ============================================================
+        # CONTEXT 2: MMF Account Help
+        # ============================================================
+        if any(word in last_bot for word in ['mmf', 'money market', 'sanlam', 'cic', 'britam']):
+            if 'link' in last_bot or 'account' in last_bot:
+                if is_yes:
+                    response = "Poa! " if swahili_ratio > 0.5 else "Great! "
+                    response += "Here are the direct links:\n\n"
+                    
+                    response += "**1. Sanlam MMF** (11.2% - Highest rate!)\n"
+                    response += "   🔗 https://sanlaminvestments.com\n"
+                    response += "   📱 Min: KSh 1,000\n"
+                    response += "   ⏱️ Process: 100% online, 24hrs\n\n"
+                    
+                    response += "**2. CIC MMF** (10.8%)\n"
+                    response += "   🔗 https://cicgroup.co.ke/investments\n"
+                    response += "   📱 Min: KSh 5,000\n"
+                    response += "   ⏱️ Process: Online + ID upload\n\n"
+                    
+                    response += "**3. Britam MMF** (10.5%)\n"
+                    response += "   🔗 https://britam.com/investments\n"
+                    response += "   📱 Min: KSh 1,000\n\n"
+                    
+                    response += "**Quick Steps:**\n"
+                    response += "1. Click link above\n"
+                    response += "2. Find 'Register' or 'Open Account'\n"
+                    response += "3. Fill form (5 mins)\n"
+                    response += "4. Upload ID photo\n"
+                    response += "5. Fund via M-Pesa!\n\n"
+                    
+                    if swahili_ratio > 0.5:
+                        response += "Ungependa nisaidie na registration? 😊"
+                    else:
+                        response += "Need help with registration? 😊"
+                    
+                    return response
+        
+        # ============================================================
+        # CONTEXT 3: Bank Account Question
+        # ============================================================
+        if 'bank account' in last_bot and '?' in last_bot:
+            if is_yes:
+                if swahili_ratio > 0.5:
+                    return "Poa! Basi unaweza enda bank yako direct na kufungua CDS account. Itachukua siku 1-2 tu. Una bank gani? 😊"
+                else:
+                    return "Perfect! You can go directly to your bank and open a CDS account. It takes just 1-2 days. Which bank do you use? 😊"
+            else:
+                if swahili_ratio > 0.5:
+                    return "Sawa, lazima ufungue bank account kwanza. Ungependa recommendations za banks? 😊"
+                else:
+                    return "Okay, you'll need to open a bank account first. Would you like bank recommendations? 😊"
+        
+        # ============================================================
+        # CONTEXT 4: Generic follow-up
+        # ============================================================
+        return self._generic_affirmation_response(is_yes, swahili_ratio)
+    
+    def _generic_affirmation_response(self, is_yes: bool, swahili_ratio: float) -> str:
+        """Generic yes/no response"""
+        
+        if is_yes:
+            if swahili_ratio > 0.5:
+                return "Sawa! Nikusaidie na nini zaidi? 😊"
+            else:
+                return "Great! What else can I help you with? 😊"
         else:
-            option_num = 1  # Default to first
+            if swahili_ratio > 0.5:
+                return "Hakuna shida! Kuna swali lingine? 😊"
+            else:
+                return "No worries! Any other questions? 😊"
+    
+    def _handle_option_selection(self, option_num: int, context, swahili_ratio: float, live_data) -> str:
+        """
+        Handle when user selects option 1, 2, or 3
         
-        # Check if we were discussing investments
-        if context.last_amount:
-            amount = context.last_amount
+        Provides detailed breakdown and next steps
+        """
+        
+        logger.info(f"Handling option selection: {option_num}")
+        
+        greeting = "Poa choice!" if swahili_ratio > 0.5 else "Great choice!"
+        
+        # Must have investment context
+        if not context.last_amount:
+            if swahili_ratio > 0.5:
+                return f"{greeting} Remind me - tulikuwa tunaongea kuhusu investment ya kiasi gani? 😊"
+            else:
+                return f"{greeting} Could you remind me - what amount were we discussing? 😊"
+        
+        amount = context.last_amount
+        
+        # Get current rates
+        treasury_rates = live_data.get('treasury_rates', {}) if live_data else {}
+        tbills = treasury_rates.get('treasury_bills', {})
+        tbill_rate = tbills.get('364_day', {}).get('rate', 17.5)
+        
+        mmf_analysis = live_data.get('mmf_analysis', {}) if live_data else {}
+        best_mmf = mmf_analysis.get('best')
+        mmf_rate = best_mmf['rate'] if best_mmf else 11.0
+        mmf_name = best_mmf['name'] if best_mmf else "Money Market Fund"
+        
+        # ============================================================
+        # OPTION 1: TREASURY BILLS
+        # ============================================================
+        if option_num == 1:
+            response = f"{greeting} Treasury Bills are excellent! Here's your complete plan:\n\n"
             
-            if option_num == 1:
-                # Treasury Bills
-                response = f"{greeting} Treasury Bills are an excellent choice! Here's what you need to know:\n\n"
-                response += f"**💰 Investment**: KSh {amount:,}\n"
-                response += f"**📈 Expected Return**: 17.5% per year\n"
-                response += f"**💵 Profit**: KSh {int(amount * 0.175):,}\n"
-                response += f"**🏦 Total after 1 year**: KSh {int(amount * 1.175):,}\n\n"
-                
-                response += "**How to invest:**\n"
-                response += "1. Open a CDS account at your bank or CBK\n"
-                response += "2. Fund your account (minimum KSh 100,000)\n"
-                response += "3. Buy 364-day T-Bills during weekly auction (Tuesdays)\n"
-                response += "4. Money is locked for 1 year\n"
-                response += "5. Get principal + interest at maturity\n\n"
-                
-                response += "**✅ Benefits:**\n"
-                response += "• Government-backed (100% safe)\n"
-                response += "• Highest guaranteed returns\n"
-                response += "• Interest is taxable at 15%\n\n"
-                
-                if swahili_ratio > 0.5:
-                    response += "Ungependa kusaidia na CDS account process? 😊"
-                else:
-                    response += "Would you like help with the CDS account process? 😊"
+            response += f"**💰 YOUR INVESTMENT**\n"
+            response += f"Amount: KSh {amount:,}\n"
+            response += f"Rate: {tbill_rate:.1f}% per year\n"
+            response += f"Profit: KSh {int(amount * (tbill_rate/100)):,}\n"
+            response += f"Total after 1 year: KSh {int(amount * (1 + tbill_rate/100)):,}\n\n"
             
-            elif option_num == 2:
-                # Money Market Fund
-                response = f"{greeting} Money Market Funds are perfect for flexibility! Here's the breakdown:\n\n"
-                response += f"**💰 Investment**: KSh {amount:,}\n"
-                response += f"**📈 Expected Return**: ~11% per year\n"
-                response += f"**💵 Profit**: KSh {int(amount * 0.11):,}\n"
-                response += f"**🏦 Total after 1 year**: KSh {int(amount * 1.11):,}\n\n"
-                
-                response += "**Top MMFs to consider:**\n"
-                response += "1. **Sanlam MMF** - 11.2% (Min: KSh 1,000)\n"
-                response += "   Website: sanlaminvestments.com\n"
-                response += "2. **CIC MMF** - 10.8% (Min: KSh 5,000)\n"
-                response += "   Website: cicgroup.co.ke\n"
-                response += "3. **Britam MMF** - 10.5% (Min: KSh 1,000)\n"
-                response += "   Website: britam.com\n\n"
-                
-                response += "**How to invest:**\n"
-                response += "1. Visit fund website (e.g., sanlaminvestments.com)\n"
-                response += "2. Fill registration form online\n"
-                response += "3. Upload ID and KRA PIN\n"
-                response += "4. Deposit via M-Pesa or bank transfer\n"
-                response += "5. Can withdraw to M-Pesa in 1-2 days!\n\n"
-                
-                response += "**✅ Benefits:**\n"
-                response += "• Withdraw anytime (very liquid)\n"
-                response += "• Better than bank savings\n"
-                response += "• Low minimum investment\n\n"
-                
-                if swahili_ratio > 0.5:
-                    response += "Ungependa link ya kufungua account? 😊"
-                else:
-                    response += "Would you like me to guide you through opening an account? 😊"
+            response += f"**📋 HOW TO INVEST (Step by Step)**\n\n"
+            response += f"**Step 1: Open CDS Account**\n"
+            response += f"• Go to your bank (Equity, KCB, Co-op, etc.)\n"
+            response += f"• Say: \"I want a CDS account for T-Bills\"\n"
+            response += f"• Bring: National ID, KRA PIN\n"
+            response += f"• Pay: ~KSh 1,100 registration\n"
+            response += f"• Time: 1-2 days to activate\n\n"
             
-            elif option_num == 3:
-                # SACCO
-                response = f"{greeting} SACCOs are smart for getting loans later! Here's the plan:\n\n"
-                response += f"**💰 Investment**: KSh {amount:,}\n"
-                response += f"**📈 Expected Return**: ~10% dividends\n"
-                response += f"**💵 Profit**: KSh {int(amount * 0.10):,}\n"
-                response += f"**🏦 Total after 1 year**: KSh {int(amount * 1.10):,}\n\n"
-                
-                response += f"**🎁 BONUS**: After 6 months, qualify for loans up to KSh {int(amount * 3):,} (3x your deposit)!\n\n"
-                
-                response += "**Popular SACCOs:**\n"
-                response += "1. **Stima SACCO** - Good returns, reliable\n"
-                response += "2. **Mwalimu SACCO** - For teachers, open to public\n"
-                response += "3. **Kenya Police SACCO** - Excellent rates\n"
-                response += "4. **Harambee SACCO** - Accessible to anyone\n\n"
-                
-                response += "**How to join:**\n"
-                response += "1. Choose a SACCO (check if employer has one)\n"
-                response += "2. Visit branch with ID\n"
-                response += "3. Pay registration fee (KSh 500-1,000)\n"
-                response += "4. Buy shares (your deposit becomes shares)\n"
-                response += "5. Start earning dividends quarterly\n\n"
-                
-                if swahili_ratio > 0.5:
-                    response += "Nataka kukuonesha nearest SACCO? 😊"
-                else:
-                    response += "Need help finding a SACCO near you? 😊"
+            response += f"**Step 2: Fund Your CDS Account**\n"
+            response += f"• Transfer KSh {amount:,} from your bank to CDS account\n"
+            response += f"• Your bank will help with this\n\n"
+            
+            response += f"**Step 3: Buy T-Bills**\n"
+            response += f"• T-Bill auctions happen every Tuesday\n"
+            response += f"• Tell your bank: \"Buy 364-day T-Bills\"\n"
+            response += f"• Or use CBK online portal\n"
+            response += f"• Money auto-debited on auction day\n\n"
+            
+            response += f"**Step 4: Wait & Earn**\n"
+            response += f"• Money locked for 364 days\n"
+            response += f"• After 1 year: Get KSh {int(amount * (1 + tbill_rate/100)):,}\n"
+            response += f"• Interest taxed at 15%\n\n"
+            
+            response += f"**✅ BENEFITS**\n"
+            response += f"• 100% government-backed (safest investment!)\n"
+            response += f"• Highest guaranteed returns in Kenya\n"
+            response += f"• No fees, no hidden charges\n\n"
+            
+            response += f"**⚠️ IMPORTANT**\n"
+            response += f"• Cannot withdraw before 364 days\n"
+            response += f"• Minimum: KSh 100,000\n"
+            response += f"• Interest is taxable\n\n"
+            
+            if swahili_ratio > 0.5:
+                response += f"Ungependa nisaidie na CDS account process? 😊"
+            else:
+                response += f"Would you like help with opening the CDS account? 😊"
             
             return response
         
-        # Generic option selection (no context)
-        if swahili_ratio > 0.5:
-            return f"{greeting} Nikusaidie vizuri, remind me - tulikuwa tunaongea kuhusu nini? 😊"
-        else:
-            return f"{greeting} Could you remind me which options we were discussing? I want to give you the best details! 😊"
+        # ============================================================
+        # OPTION 2: MONEY MARKET FUND
+        # ============================================================
+        elif option_num == 2:
+            response = f"{greeting} {mmf_name} is perfect for flexibility! Here's your plan:\n\n"
+            
+            response += f"**💰 YOUR INVESTMENT**\n"
+            response += f"Amount: KSh {amount:,}\n"
+            response += f"Rate: {mmf_rate:.1f}% per year\n"
+            response += f"Profit: KSh {int(amount * (mmf_rate/100)):,}\n"
+            response += f"Total after 1 year: KSh {int(amount * (1 + mmf_rate/100)):,}\n\n"
+            
+            response += f"**🏆 TOP MMF OPTIONS**\n\n"
+            response += f"**1. Sanlam MMF** (11.2%) ⭐ BEST\n"
+            response += f"   Min: KSh 1,000\n"
+            response += f"   Liquidity: Withdraw anytime (1-2 days)\n"
+            response += f"   Website: sanlaminvestments.com\n\n"
+            
+            response += f"**2. CIC MMF** (10.8%)\n"
+            response += f"   Min: KSh 5,000\n"
+            response += f"   Liquidity: 1-2 days\n"
+            response += f"   Website: cicgroup.co.ke/investments\n\n"
+            
+            response += f"**3. Britam MMF** (10.5%)\n"
+            response += f"   Min: KSh 1,000\n"
+            response += f"   Liquidity: 2-3 days\n"
+            response += f"   Website: britam.com/investments\n\n"
+            
+            response += f"**📋 HOW TO INVEST (Step by Step)**\n\n"
+            response += f"**Step 1: Choose MMF**\n"
+            response += f"• Recommendation: Sanlam (highest rate + lowest min)\n\n"
+            
+            response += f"**Step 2: Register Online**\n"
+            response += f"• Visit: sanlaminvestments.com\n"
+            response += f"• Click 'Open Account' or 'Register'\n"
+            response += f"• Fill form (Name, ID, Phone, Email, KRA PIN)\n"
+            response += f"• Upload ID photo (clear photo)\n"
+            response += f"• Time: 5-10 minutes\n\n"
+            
+            response += f"**Step 3: Account Verification**\n"
+            response += f"• Wait for approval email/SMS (24-48 hours)\n"
+            response += f"• You'll get account number\n\n"
+            
+            response += f"**Step 4: Fund Your Account**\n"
+            response += f"• M-Pesa: Send to MMF paybill\n"
+            response += f"• Bank: Transfer to account number\n"
+            response += f"• Amount: KSh {amount:,}\n\n"
+            
+            response += f"**Step 5: Watch It Grow**\n"
+            response += f"• Interest calculated daily\n"
+            response += f"• Can withdraw anytime to M-Pesa!\n"
+            response += f"• No lock-in period\n\n"
+            
+            response += f"**✅ BENEFITS**\n"
+            response += f"• Withdraw anytime (super flexible!)\n"
+            response += f"• Much better than bank savings (2-5%)\n"
+            response += f"• Low minimum (KSh 1,000)\n"
+            response += f"• Daily interest calculation\n\n"
+            
+            if swahili_ratio > 0.5:
+                response += f"Ungependa links za kufungua account? 😊"
+            else:
+                response += f"Would you like the registration links? 😊"
+            
+            return response
+        
+        # ============================================================
+        # OPTION 3: SACCO
+        # ============================================================
+        elif option_num == 3:
+            response = f"{greeting} SACCO is smart for getting loans! Here's your plan:\n\n"
+            
+            response += f"**💰 YOUR INVESTMENT**\n"
+            response += f"Amount: KSh {amount:,}\n"
+            response += f"Dividends: ~10% per year\n"
+            response += f"Profit: KSh {int(amount * 0.10):,}\n"
+            response += f"Total after 1 year: KSh {int(amount * 1.10):,}\n\n"
+            
+            response += f"**🎁 BONUS BENEFIT**\n"
+            response += f"After 6 months, qualify for loans up to:\n"
+            response += f"**KSh {int(amount * 3):,}** (3x your deposit!)\n"
+            response += f"At low interest: 12-14% vs 15-20% at banks\n\n"
+            
+            response += f"**🏆 TOP SACCO OPTIONS**\n\n"
+            response += f"**1. Stima SACCO**\n"
+            response += f"   • Open to public\n"
+            response += f"   • Good returns + reliable\n"
+            response += f"   • Strong loan program\n\n"
+            
+            response += f"**2. Mwalimu SACCO**\n"
+            response += f"   • For teachers (but open to all)\n"
+            response += f"   • Excellent dividends\n"
+            response += f"   • Very stable\n\n"
+            
+            response += f"**3. Kenya Police SACCO**\n"
+            response += f"   • Open to public\n"
+            response += f"   • Competitive rates\n"
+            response += f"   • Good customer service\n\n"
+            
+            response += f"**4. Harambee SACCO**\n"
+            response += f"   • Accessible to everyone\n"
+            response += f"   • No restrictions\n\n"
+            
+            response += f"**📋 HOW TO JOIN (Step by Step)**\n\n"
+            response += f"**Step 1: Choose SACCO**\n"
+            response += f"• Check if your employer has one (best option)\n"
+            response += f"• Or choose from list above\n\n"
+            
+            response += f"**Step 2: Visit Branch**\n"
+            response += f"• Bring: National ID, Payslip (if employed)\n"
+            response += f"• Ask: \"I want to join SACCO\"\n\n"
+            
+            response += f"**Step 3: Registration**\n"
+            response += f"• Fill membership form\n"
+            response += f"• Pay registration: KSh 500-1,000\n"
+            response += f"• Buy shares: Your KSh {amount:,} becomes shares\n\n"
+            
+            response += f"**Step 4: Start Earning**\n"
+            response += f"• Dividends paid quarterly or annually\n"
+            response += f"• Attend AGM (Annual General Meeting)\n"
+            response += f"• Vote on SACCO decisions\n\n"
+            
+            response += f"**✅ BENEFITS**\n"
+            response += f"• Get dividends (10-12%)\n"
+            response += f"• Qualify for cheap loans (3x deposit)\n"
+            response += f"• Build credit history\n"
+            response += f"• You own part of SACCO\n\n"
+            
+            response += f"**⚠️ NOTES**\n"
+            response += f"• Less liquid than MMF\n"
+            response += f"• Withdrawal may take 1-2 weeks\n"
+            response += f"• But loan access makes up for it!\n\n"
+            
+            if swahili_ratio > 0.5:
+                response += f"Ungependa kusaidia kutafuta SACCO karibu na wewe? 😊"
+            else:
+                response += f"Need help finding a SACCO near you? 😊"
+            
+            return response
+        
+        # Unknown option
+        return self._generic_affirmation_response(True, swahili_ratio)
+    
+    def _handle_amount_follow_up(self, amount: int, context, live_data, swahili_ratio: float) -> str:
+        """
+        Handle when user just states an amount as follow-up
+        
+        Example:
+        Bot: "How much do you want to invest?"
+        User: "50k"
+        """
+        
+        logger.info(f"Handling amount follow-up: {amount}")
+        
+        # Generate investment advice with this amount
+        advice = self.advisor.generate_investment_advice(
+            amount=amount,
+            goal=context.user_preferences.get('goal'),
+            urgency='flexible',
+            language_mix=swahili_ratio,
+            live_data=live_data
+        )
+        
+        greeting = self.phrases.get_transition() if swahili_ratio > 0.5 else "Alright,"
+        
+        return f"{greeting} {advice}"
     
     def _generate_single_investment_advice(self, amount, context, live_data, swahili_ratio):
         """
-        Generate advice for putting ALL money in ONE place
+        Generate advice for ONE place investment
         
-        User explicitly rejected diversification
+        User rejected diversification
         """
         
         greeting = "Sawa," if swahili_ratio > 0.5 else "Got it,"
         
-        # If no amount, use context or ask
+        # If no amount, ask
         if not amount:
-            if context.last_amount:
-                amount = context.last_amount
+            if swahili_ratio > 0.5:
+                return f"{greeting} unataka kuweka pesa yote mahali pamoja. Ni kiasi gani? 😊"
             else:
-                if swahili_ratio > 0.5:
-                    return f"{greeting} unataka kuweka pesa yote mahali pamoja. Ni kiasi gani? Nitakusaidia kuchagua best option! 😊"
-                else:
-                    return f"{greeting} you want to put everything in one place. How much are you investing? That will help me recommend the BEST single option for you! 😊"
+                return f"{greeting} you want to put everything in one place. How much are you investing? 😊"
         
-        response = f"{greeting} you want to invest ALL KSh {amount:,} in ONE place. Here are your best single-investment options:\n\n"
+        response = f"{greeting} you want to invest ALL KSh {amount:,} in ONE place.\n\n"
+        response += f"Here are your best single-investment options:\n\n"
         
-        # Get current rates from live data
+        # Get rates
         treasury_rates = live_data.get('treasury_rates', {}) if live_data else {}
         tbills = treasury_rates.get('treasury_bills', {})
-        tbill_364 = tbills.get('364_day', {}).get('rate', 17.5)
+        tbill_rate = tbills.get('364_day', {}).get('rate', 17.5)
         
         mmf_analysis = live_data.get('mmf_analysis', {}) if live_data else {}
         best_mmf = mmf_analysis.get('best')
+        mmf_rate = best_mmf['rate'] if best_mmf else 11.0
+        mmf_name = best_mmf['name'] if best_mmf else "Money Market Fund"
         
         # Option 1: Treasury Bills
         response += f"**OPTION 1: Treasury Bills (364-day)** ⭐ RECOMMENDED\n"
-        response += f"   📍 Put ALL KSh {amount:,} here\n"
-        response += f"   💰 Current rate: **{tbill_364:.1f}%** per year\n"
-        expected_tbill = int(amount * (tbill_364 / 100))
-        response += f"   📈 After 1 year: KSh {amount + expected_tbill:,}\n"
-        response += f"   💵 Profit: KSh {expected_tbill:,}\n"
-        response += f"   ✅ Government-backed (safest option)\n"
-        response += f"   ⚠️ Locked for 1 year (can't withdraw early)\n\n"
+        response += f"   📍 Invest: KSh {amount:,}\n"
+        response += f"   💰 Rate: {tbill_rate:.1f}% per year\n"
+        response += f"   📈 After 1 year: KSh {int(amount * (1 + tbill_rate/100)):,}\n"
+        response += f"   💵 Profit: KSh {int(amount * (tbill_rate/100)):,}\n"
+        response += f"   ✅ Government-backed (100% safe)\n"
+        response += f"   ⚠️ Locked for 1 year\n\n"
         
-        # Option 2: Money Market Fund
-        if best_mmf:
-            response += f"**OPTION 2: {best_mmf['name']}**\n"
-            response += f"   📍 Put ALL KSh {amount:,} here\n"
-            response += f"   💰 Current rate: **{best_mmf['rate']}%** per year\n"
-            expected_mmf = int(amount * (best_mmf['rate'] / 100))
-            response += f"   📈 After 1 year: KSh {amount + expected_mmf:,}\n"
-            response += f"   💵 Profit: KSh {expected_mmf:,}\n"
-            response += f"   ✅ Can withdraw anytime (flexible!)\n"
-            response += f"   ⚠️ Slightly lower return than T-Bills\n\n"
-        else:
-            response += f"**OPTION 2: Money Market Fund**\n"
-            response += f"   📍 Put ALL KSh {amount:,} here\n"
-            response += f"   💰 Rate: ~11% per year\n"
-            expected_mmf = int(amount * 0.11)
-            response += f"   📈 After 1 year: KSh {amount + expected_mmf:,}\n"
-            response += f"   💵 Profit: KSh {expected_mmf:,}\n"
-            response += f"   ✅ Can withdraw anytime!\n\n"
+        # Option 2: MMF
+        response += f"**OPTION 2: {mmf_name}**\n"
+        response += f"   📍 Invest: KSh {amount:,}\n"
+        response += f"   💰 Rate: {mmf_rate:.1f}% per year\n"
+        response += f"   📈 After 1 year: KSh {int(amount * (1 + mmf_rate/100)):,}\n"
+        response += f"   💵 Profit: KSh {int(amount * (mmf_rate/100)):,}\n"
+        response += f"   ✅ Withdraw anytime (flexible!)\n"
+        response += f"   ⚠️ Lower return than T-Bills\n\n"
         
-        # Option 3: SACCO (if amount is reasonable)
+        # Option 3: SACCO (if amount >= 20k)
         if amount >= 20000:
             response += f"**OPTION 3: SACCO Deposit**\n"
-            response += f"   📍 Put ALL KSh {amount:,} here\n"
-            response += f"   💰 Returns: ~10% dividends per year\n"
-            expected_sacco = int(amount * 0.10)
-            response += f"   📈 After 1 year: KSh {amount + expected_sacco:,}\n"
-            response += f"   💵 Profit: KSh {expected_sacco:,}\n"
-            response += f"   ✅ BONUS: Qualify for loans (3x your deposit!)\n"
+            response += f"   📍 Invest: KSh {amount:,}\n"
+            response += f"   💰 Rate: ~10% dividends\n"
+            response += f"   📈 After 1 year: KSh {int(amount * 1.10):,}\n"
+            response += f"   💵 Profit: KSh {int(amount * 0.10):,}\n"
+            response += f"   🎁 BONUS: Loans up to KSh {int(amount * 3):,}!\n"
             response += f"   ⚠️ Less liquid than MMF\n\n"
         
-        # My recommendation
-        response += f"💡 **My Recommendation**: "
-        
+        # Recommendation
+        response += f"**💡 MY RECOMMENDATION**: "
         if amount >= 100000:
-            response += f"Treasury Bills (364-day) - highest guaranteed return at {tbill_364:.1f}%"
+            response += f"Treasury Bills - highest guaranteed return ({tbill_rate:.1f}%)"
         elif amount >= 50000:
-            response += f"SACCO - good returns PLUS you qualify for loans"
+            response += f"SACCO - good returns PLUS loan access"
         else:
-            if best_mmf:
-                response += f"{best_mmf['name']} - flexible access with {best_mmf['rate']}% returns"
-            else:
-                response += "Money Market Fund - flexible with good returns"
+            response += f"{mmf_name} - flexible with {mmf_rate:.1f}% returns"
+        
+        response += f"\n\n"
         
         if swahili_ratio > 0.5:
-            response += f"\n\nOption gani inakupendeza? 😊"
+            response += f"Option gani inakupendeza? (Andika 1, 2, au 3) 😊"
         else:
-            response += f"\n\nWhich option interests you most? 😊"
+            response += f"Which option interests you? (Type 1, 2, or 3) 😊"
+        
+        # Save context
+        context.save_investment_context(amount, {}, ['option 1', 'option 2', 'option 3'])
         
         return response
     
     def _generate_return_calculation(self, context, swahili_ratio):
-        """Calculate and explain returns from previous advice"""
+        """Calculate and explain returns"""
         
         greeting = "Sawa," if swahili_ratio > 0.5 else "Good question!"
         
         returns = context.calculate_expected_returns()
         
         if not returns:
-            # No previous context - ask for specifics
             if swahili_ratio > 0.5:
-                return f"{greeting} nisaidie na details - unataka invest kiasi gani na wapi? Nitakucalculate returns! 😊"
+                return f"{greeting} nisaidie - unataka invest kiasi gani na wapi? Nitakucalculate returns! 😊"
             else:
-                return f"{greeting} let me know how much you're investing and where, and I'll calculate your expected returns! 😊"
+                return f"{greeting} let me know how much you're investing and where, I'll calculate returns! 😊"
         
-        response = f"{greeting} based on the KSh {returns['initial_amount']:,} we discussed:\n\n"
+        response = f"{greeting} based on KSh {returns['initial_amount']:,}:\n\n"
         
         if returns['breakdown']:
-            response += "**Expected Returns After 1 Year:**\n\n"
+            response += f"**Expected Returns After 1 Year:**\n\n"
             
             for name, data in returns['breakdown'].items():
                 response += f"• **{name}**:\n"
@@ -370,88 +611,30 @@ class ResponseGenerator:
                 response += f"  Total: KSh {data['total']:,}\n\n"
         
         response += f"**💰 TOTAL EXPECTED:**\n"
-        response += f"   Start with: KSh {returns['initial_amount']:,}\n"
+        response += f"   Initial: KSh {returns['initial_amount']:,}\n"
         response += f"   Profit: KSh {returns['total_return']:,}\n"
-        response += f"   End with: KSh {returns['final_amount']:,}\n"
-        response += f"   Overall return: {returns['overall_rate']:.1f}%\n\n"
+        response += f"   Final: KSh {returns['final_amount']:,}\n"
+        response += f"   Return: {returns['overall_rate']:.1f}%\n\n"
         
         if swahili_ratio > 0.5:
-            response += f"💡 Hizi ni estimated returns. Actual returns inategemea market conditions!"
+            response += f"💡 Hizi ni estimated returns. Actual inategemea market!"
         else:
-            response += f"💡 These are estimated returns. Actual may vary slightly based on market conditions."
-        
-        return response
-    
-    def _generate_mmf_comparison(self, live_data, swahili_ratio: float) -> str:
-        """Generate MMF comparison with live rates"""
-        
-        greeting = "Sawa," if swahili_ratio > 0.5 else "Here are"
-        
-        response = f"{greeting} the current Money Market Fund rates:\n\n"
-        
-        # Try to get live MMF data
-        if live_data and live_data.get('mmf_rates'):
-            mmf_rates = live_data['mmf_rates']
-            
-            # Sort by rate
-            sorted_mmfs = sorted(
-                mmf_rates.items(),
-                key=lambda x: x[1]['current_rate'],
-                reverse=True
-            )
-            
-            response += "**📊 LIVE RATES** (updated today):\n\n"
-            
-            for i, (name, data) in enumerate(sorted_mmfs, 1):
-                emoji = "⭐" if i == 1 else "✅" if i <= 3 else "📊"
-                
-                response += f"{i}. {emoji} **{name}**\n"
-                response += f"   Rate: **{data['current_rate']}%** per year\n"
-                response += f"   Minimum: KSh {data['minimum']:,}\n"
-                response += f"   Liquidity: {data['liquidity']}\n"
-                response += f"   Rating: {data['recommendation']}\n\n"
-            
-            # Add recommendation
-            best = sorted_mmfs[0]
-            response += f"💡 **Best Option**: {best[0]} at {best[1]['current_rate']}%\n\n"
-            
-            # Compare to alternatives
-            response += f"**📈 Comparison**:\n"
-            response += f"• Bank savings: 2-5% (much lower!)\n"
-            response += f"• Treasury Bills: 17.5% (but locked 1 year)\n"
-            response += f"• MMF: {best[1]['current_rate']}% (withdraw anytime!)\n"
-        
-        else:
-            # Fallback to typical rates
-            response += "**Top MMFs** (current market rates):\n\n"
-            response += "1. ⭐ **Sanlam Money Market Fund**\n"
-            response += "   Rate: 11.2% | Min: KSh 1,000 | Liquidity: 1-2 days\n\n"
-            response += "2. ✅ **CIC Money Market Fund**\n"
-            response += "   Rate: 10.8% | Min: KSh 5,000 | Liquidity: 1-2 days\n\n"
-            response += "3. ✅ **Britam Money Market Fund**\n"
-            response += "   Rate: 10.5% | Min: KSh 1,000 | Liquidity: 2-3 days\n\n"
-            response += "4. 📊 **Old Mutual Money Market**\n"
-            response += "   Rate: 10.3% | Min: KSh 5,000 | Liquidity: 1-2 days\n\n"
-            
-            response += "💡 **Best**: Sanlam at 11.2% - highest rate + lowest minimum!\n"
-        
-        if swahili_ratio > 0.5:
-            response += "\nUngependa kuweka pesa ngapi? Nitakuguide! 😊"
-        else:
-            response += "\nHow much are you looking to invest? I can give you specific advice! 😊"
+            response += f"💡 These are estimated. Actual may vary with market conditions."
         
         return response
     
     def generate_response(self, knowledge_result, user_language_pattern, 
                          include_proverb=False, user_query=None, live_data=None, context=None):
         """
-        Generate response matching user's language pattern
-        
         Main response generation for knowledge base matches
+        
+        Used when we found a KB match
         """
         
         if not knowledge_result:
-            return self._generate_fallback_response(user_language_pattern, user_query, live_data, context)
+            return self._generate_fallback_response(
+                user_language_pattern, user_query, live_data, context
+            )
         
         # Start with greeting
         response = self._add_greeting(user_language_pattern)
@@ -475,12 +658,12 @@ class ResponseGenerator:
         # Add proverb
         if include_proverb and random.random() < 0.7:
             proverb = self.phrases.get_random_proverb()
-            response += f"\n\n💡 Remember: \"{proverb['swahili']}\" ({proverb['english']}) - {proverb['meaning']}"
+            response += f"\n\n💡 \"{proverb['swahili']}\" ({proverb['english']}) - {proverb['meaning']}"
         
         return response
     
     def _add_greeting(self, language_pattern):
-        """Add appropriate greeting"""
+        """Add greeting"""
         swahili_ratio = language_pattern.get('swahili_ratio', 0.5)
         
         if swahili_ratio > 0.6:
@@ -491,7 +674,7 @@ class ResponseGenerator:
             return self.phrases.get_transition()
     
     def _adapt_language(self, text, language_pattern):
-        """Adapt response to match user's language pattern"""
+        """Adapt to user's language mix"""
         swahili_ratio = language_pattern.get('swahili_ratio', 0.5)
         
         if swahili_ratio > 0.4:
@@ -502,106 +685,176 @@ class ResponseGenerator:
         return text
     
     def _is_market_related(self, category: str) -> bool:
-        """Check if category benefits from live data"""
+        """Check if benefits from live data"""
         market_categories = ['stocks', 'etfs', 'investment', 'global_stocks', 'savings']
         return category in market_categories if category else False
     
     def _enhance_with_live_data(self, answer: str, live_data: dict) -> str:
-        """Add live market data snippet to answer"""
+        """Add live data snippet"""
         enhancement = ""
         
         if live_data.get('market_summary'):
             summary = live_data['market_summary']
-            enhancement += f"\n\n📊 **Live Update**: NSE is {summary['emoji']} {summary['sentiment']} today (Avg: {summary['avg_change']:+.1f}%)"
-        
-        if live_data.get('mmf_analysis', {}).get('best'):
-            best_mmf = live_data['mmf_analysis']['best']
-            enhancement += f"\n💰 Top MMF now: {best_mmf['name']} ({best_mmf['rate']}%)"
+            enhancement += f"\n\n📊 NSE: {summary['emoji']} {summary['sentiment']} (Avg: {summary['avg_change']:+.1f}%)"
         
         return answer + enhancement
     
     def _generate_fallback_response(self, language_pattern, user_query=None, live_data=None, context=None):
-        """Generate intelligent fallback response"""
+        """
+        Intelligent fallback - HANDLES ALL INTENTS
+        
+        This is the SAFETY NET
+        """
         
         swahili_ratio = language_pattern.get('swahili_ratio', 0.5)
         greeting = self.phrases.get_transition() if swahili_ratio > 0.5 else "Alright,"
         
-        if user_query:
-            analysis = self.intent_analyzer.analyze(user_query)
+        if not user_query:
+            return self._generic_help(swahili_ratio)
+        
+        # Analyze with context
+        analysis = self.intent_analyzer.analyze(user_query, context)
+        
+        # ============================================================
+        # HANDLE EACH INTENT
+        # ============================================================
+        
+        # MMF Query
+        if analysis['intent'] == 'mmf_query':
+            return self._generate_mmf_comparison(live_data, swahili_ratio)
+        
+        # Bank Comparison
+        if analysis['intent'] == 'bank_comparison':
+            return self._generate_bank_comparison(swahili_ratio, analysis['amount'])
+        
+        # Investment Advice
+        if analysis['intent'] == 'investment_advice':
+            advice = self.advisor.generate_investment_advice(
+                amount=analysis['amount'],
+                goal=analysis['goal'],
+                urgency=analysis['urgency'],
+                language_mix=swahili_ratio,
+                live_data=live_data
+            )
+            return f"{greeting} {advice}"
+        
+        # Stock Queries
+        if analysis['intent'] in ['stock_query', 'stock_recommendation']:
+            advice = self.advisor.generate_stock_advice(
+                amount=analysis['amount'],
+                experience='beginner',
+                market='nse',
+                language_mix=swahili_ratio,
+                live_data=live_data
+            )
+            return f"{greeting} {advice}"
+        
+        # Global Stocks
+        if analysis['intent'] == 'global_stocks_query':
+            advice = self.advisor.generate_stock_advice(
+                amount=analysis['amount'],
+                experience='beginner',
+                market='international',
+                language_mix=swahili_ratio,
+                live_data=live_data
+            )
+            return f"{greeting} {advice}"
+        
+        # ETF Query
+        if analysis['intent'] == 'etf_query':
+            if swahili_ratio > 0.5:
+                return f"{greeting} ETFs ni baskets ya stocks bought as one. Kenya ina limited local ETFs, lakini unaweza access global ETFs (S&P 500, Vanguard) kupitia international brokers like Interactive Brokers. Minimum: $100-500. Alternatively, consider local unit trusts (CIC, Sanlam)! 😊"
+            else:
+                return f"{greeting} ETFs are baskets of stocks bought as one investment. Kenya has limited local ETFs, but you can access global ETFs through international brokers. Popular ones: S&P 500 (SPY, VOO). Consider local unit trusts as alternatives! 😊"
+        
+        # Treasury Query
+        if analysis['intent'] == 'treasury_query':
+            treasury_rates = live_data.get('treasury_rates', {}) if live_data else {}
+            tbills = treasury_rates.get('treasury_bills', {})
             
-            # Handle MMF queries
-            if analysis['intent'] == 'mmf_query':
-                return self._generate_mmf_comparison(live_data, swahili_ratio)
+            response = f"{greeting} current Treasury rates:\n\n"
+            response += f"**T-Bills:**\n"
+            response += f"• 91-day: {tbills.get('91_day', {}).get('rate', 16.8):.1f}%\n"
+            response += f"• 182-day: {tbills.get('182_day', {}).get('rate', 17.2):.1f}%\n"
+            response += f"• 364-day: {tbills.get('364_day', {}).get('rate', 17.5):.1f}% ⭐\n\n"
+            response += f"Minimum: KSh 100,000\n"
+            response += f"Risk: Zero (government-backed)\n\n"
             
-            # Handle investment advice
-            if analysis['intent'] == 'investment_advice':
-                advice = self.advisor.generate_investment_advice(
-                    amount=analysis['amount'],
-                    goal=analysis['goal'],
-                    urgency=analysis['urgency'],
-                    language_mix=swahili_ratio,
-                    live_data=live_data
-                )
-                return f"{greeting} {advice}"
+            if swahili_ratio > 0.5:
+                response += f"Ungependa kusave pesa ngapi? 😊"
+            else:
+                response += f"How much would you like to invest? 😊"
             
-            # Handle stock queries
-            elif analysis['intent'] in ['stock_query', 'stock_recommendation']:
-                advice = self.advisor.generate_stock_advice(
-                    amount=analysis['amount'],
-                    experience='beginner',
-                    market='nse',
-                    language_mix=swahili_ratio,
-                    live_data=live_data
-                )
-                return f"{greeting} {advice}"
-            
-            # Handle global stocks
-            elif analysis['intent'] == 'global_stocks_query':
-                advice = self.advisor.generate_stock_advice(
-                    amount=analysis['amount'],
-                    experience='beginner',
-                    market='international',
-                    language_mix=swahili_ratio,
-                    live_data=live_data
-                )
-                return f"{greeting} {advice}"
+            return response
         
         # Generic fallback
-        if swahili_ratio > 0.6:
-            return "Pole, nisaidie na details zaidi. Unataka kujua kuhusu nini? Stocks? Akiba? M-Pesa? Una pesa ngapi? 😊"
-        elif swahili_ratio < 0.3:
-            return "I'd love to help! What specifically would you like to know? Stocks, savings, M-Pesa, loans? How much money are you working with? 😊"
+        return self._generic_help(swahili_ratio)
+    
+    def _generate_mmf_comparison(self, live_data, swahili_ratio):
+        """MMF comparison"""
+        
+        greeting = "Sawa," if swahili_ratio > 0.5 else "Here are"
+        response = f"{greeting} the top Money Market Funds:\n\n"
+        
+        if live_data and live_data.get('mmf_rates'):
+            mmf_rates = live_data['mmf_rates']
+            sorted_mmfs = sorted(mmf_rates.items(), key=lambda x: x[1]['current_rate'], reverse=True)
+            
+            for i, (name, data) in enumerate(sorted_mmfs, 1):
+                emoji = "⭐" if i == 1 else "✅"
+                response += f"{i}. {emoji} **{name}**\n"
+                response += f"   Rate: {data['current_rate']}%\n"
+                response += f"   Min: KSh {data['minimum']:,}\n"
+                response += f"   Liquidity: {data['liquidity']}\n\n"
         else:
-            return "Pole, nisaidie with more details. What do you want to know? Stocks, savings, loans? How much pesa una? 😊"
+            response += "1. ⭐ **Sanlam MMF** - 11.2% (Min: 1k)\n"
+            response += "2. ✅ **CIC MMF** - 10.8% (Min: 5k)\n"
+            response += "3. ✅ **Britam MMF** - 10.5% (Min: 1k)\n\n"
+        
+        if swahili_ratio > 0.5:
+            response += "Una pesa ngapi unataka save? 😊"
+        else:
+            response += "How much do you want to invest? 😊"
+        
+        return response
+    
+    def _generate_bank_comparison(self, swahili_ratio, amount):
+        """Bank comparison"""
+        
+        if swahili_ratio > 0.5:
+            response = "Sawa, best banks in Kenya:\n\n"
+        else:
+            response = "Here are the best banks:\n\n"
+        
+        response += "1. ⭐ **Equity Bank** - Low fees, most accessible\n"
+        response += "2. ✅ **KCB** - Largest, reliable\n"
+        response += "3. ✅ **Co-operative Bank** - Good for chamas\n"
+        response += "4. ✅ **NCBA** - Modern digital banking\n\n"
+        
+        response += "**💡 Recommendation**: "
+        if amount and amount < 50000:
+            response += "Equity Bank (lowest fees)"
+        else:
+            response += "KCB or Equity (both excellent)"
+        
+        return response
+    
+    def _generic_help(self, swahili_ratio):
+        """Generic help message"""
+        if swahili_ratio > 0.6:
+            return "Pole, nisaidie zaidi. Unataka kujua kuhusu nini? Stocks, savings, M-Pesa, loans? 😊"
+        else:
+            return "I'd love to help! What would you like to know? Stocks, savings, M-Pesa, loans? 😊"
     
     def generate_welcome_message(self):
-        """Generate welcome message"""
-        return """Habari! Welcome to the Kenyan Financial Advisor chatbot. 🇰🇪
+        """Welcome message"""
+        return """Habari! Welcome to Kenyan Financial Advisor 🇰🇪
 
 I can help you with:
-💰 Savings and investment advice (with real-time data!)
-📱 M-Pesa and mobile money
-🏦 Banking and SACCOs
-💵 Loans and credit
-👥 Chamas and savings groups
-📈 NSE stocks and global markets
-📊 Treasury Bills and Money Market Funds
+💰 Investment advice (with live data!)
+📈 NSE stocks & global markets
+📊 Treasury Bills & Money Market Funds
+💵 Loans & M-Pesa
+🏦 Banks & SACCOs
 
-Feel free to ask in English, Swahili, or mix them (code-switching)! 
-
-What would you like to know? 😊"""
-
-# ============================================================================
-# TEST CODE
-# ============================================================================
-
-if __name__ == "__main__":
-    print("\n" + "="*70)
-    print(" 💬 TESTING RESPONSE GENERATOR")
-    print("="*70)
-    
-    generator = ResponseGenerator()
-    
-    print("\n" + generator.generate_welcome_message())
-    
-    print("\n✓ Response Generator ready!")
+Ask in English, Swahili, or mix! 😊"""
