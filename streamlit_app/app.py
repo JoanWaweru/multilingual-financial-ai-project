@@ -10,7 +10,15 @@ import plotly.graph_objects as go
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from chatbot.chatbot import KenyanFinancialChatbot
+from chatbot.financial_chatbot import KenyanFinancialChatbot  # ← CHANGED THIS LINE
+
+# Streamlit version compatibility
+def rerun():
+    """Backwards-compatible rerun"""
+    if hasattr(st, 'rerun'):
+        st.rerun()
+    else:
+        st.experimental_rerun()
 
 # Page configuration
 st.set_page_config(
