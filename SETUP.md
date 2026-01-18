@@ -22,6 +22,14 @@
    DATABASE_URL=sqlite:///./database/financial_advisor.db
    EMBEDDING_MODEL=text-embedding-3-small
    LLM_MODEL=gpt-4-turbo-preview
+   
+   # Optional: live NSE market data source (JSON or CSV)
+   NSE_MARKET_DATA_URL=https://your-data-source.example/nse-market-data
+   # Optional: NSE categories when using the NSE market statistics page
+   # Example values depend on the dropdown (e.g., banking, agriculture, etf)
+   # You can pass multiple categories, comma-separated
+   NSE_MARKET_CATEGORY=banking,agriculture,etf
+   NSE_MARKET_CACHE_TTL_SECONDS=900
    ```
    
    Create `frontend/.env.local`:

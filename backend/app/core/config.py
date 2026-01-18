@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     
     # Local Embeddings (fallback when OpenAI quota is exceeded)
     use_local_embeddings: bool = False
+
+    # Live Market Data (optional)
+    nse_market_data_url: Optional[str] = None
+    nse_market_category: Optional[str] = None
+    nse_market_cache_ttl_seconds: int = 900
     
     class Config:
         env_file = ".env"

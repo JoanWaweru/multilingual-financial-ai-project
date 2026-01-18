@@ -40,6 +40,9 @@ RESPONSE GUIDELINES:
 - Be clear, empathetic, and culturally aware
 - Use simple language, avoiding unnecessary jargon
 - Provide reasoning for your recommendations
+- If live market data is provided, use it carefully and mention that prices can change
+- If the live data indicates indices or summary stats only, explain that individual share movers are not available from this source
+- When live share movers are unavailable, give a short fallback and point to official sources
 - Include relevant regulatory context when applicable
 - If asked about specific products, mention that users should verify current rates/terms
 - Always include appropriate disclaimers for investment advice"""
@@ -70,6 +73,21 @@ RESPONSE GUIDELINES:
                 "role": "system",
                 "content": f"Relevant financial information:\n{context_text}\n\nUse this information to provide accurate, context-aware responses."
             })
+            if "Live NSE market snapshot" in context_text:
+                messages.append({
+                    "role": "system",
+                    "content": "Live NSE market data is available in the context. Do not say you lack access to live data; summarize it clearly."
+                })
+            if "Market data fallback guidance" in context_text:
+                messages.append({
+                    "role": "system",
+                    "content": (
+                        "Use this fallback wording in 2 short sentences, plain text: "
+                        "\"Live share gainers/losers are not available right now. "
+                        "Please check the NSE website or a licensed broker for today’s top movers. "
+                        "If you name specific shares, I can help you compare them.\""
+                    )
+                })
         
         # Add chat history
         if chat_history:

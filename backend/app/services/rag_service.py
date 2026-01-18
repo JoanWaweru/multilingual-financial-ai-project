@@ -4,6 +4,7 @@ Retrieval-Augmented Generation (RAG) service
 from typing import List, Dict
 from app.services.vector_store import vector_store
 from app.services.llm_service import llm_service
+from app.services.market_data_service import market_data_service
 from app.core.config import settings
 
 class RAGService:
@@ -32,6 +33,26 @@ class RAGService:
                 'metadata': metadata,
                 'similarity_score': 1.0 / (1.0 + distance)  # Convert distance to similarity
             })
+
+        # Add live market snapshot when query is market-related
+        if self._is_market_query(query):
+            market_snapshot = await market_data_service.get_market_snapshot(query)
+            if market_snapshot:
+                context.append({
+                    'text': market_snapshot,
+                    'metadata': {'source': 'NSE live market data'},
+                    'similarity_score': 1.0
+                })
+                if "not individual share prices" in market_snapshot:
+                    context.append({
+                        'text': (
+                            "Live share gainers/losers are not available right now. "
+                            "Suggest checking the NSE website or a licensed broker for today’s top movers. "
+                            "Offer to help compare specific shares if the user names them."
+                        ),
+                        'metadata': {'source': 'Market data fallback guidance'},
+                        'similarity_score': 0.9
+                    })
         
         # Step 2: Generate response using LLM with context
         response = await llm_service.generate_response(
@@ -52,6 +73,14 @@ class RAGService:
         ]
         
         return response
+
+    def _is_market_query(self, query: str) -> bool:
+        q = query.lower()
+        keywords = [
+            "nse", "shares", "stocks", "equity", "equities", "stock", "share",
+            "price", "market", "gainers", "losers", "dividend", "ticker"
+        ]
+        return any(k in q for k in keywords)
     
     async def retrieve_only(self, query: str, k: int = None) -> List[Dict]:
         """Retrieve documents without generating response"""
