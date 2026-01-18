@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+.next/
+out/
+.npm
+.eslintcache
+
+# Environment variables
+.env
+.env.local
+.env*.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+database/
+
+# Vector store
+data/vector_store/
+*.index
+*.pkl
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Docker
+.dockerignore
+
+backend/venv/
+frontend/node_modules/
+frontend/.next/
+**/__pycache__/
+.DS_Store
+.env
