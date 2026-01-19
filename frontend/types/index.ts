@@ -5,5 +5,6 @@ export interface Message {
   timestamp: Date
   confidence?: number
   sources?: Array<{ source: string; similarity: number }>
+  evidence?: Array<{ text: string; source: string; similarity: number }>
 }
 

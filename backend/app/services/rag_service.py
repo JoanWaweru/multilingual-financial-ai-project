@@ -77,6 +77,14 @@ class RAGService:
             }
             for doc in context
         ]
+        response['evidence'] = [
+            {
+                'text': doc['text'][:500] + "..." if len(doc['text']) > 500 else doc['text'],
+                'source': doc['metadata'].get('source', 'Unknown'),
+                'similarity': doc['similarity_score']
+            }
+            for doc in context
+        ]
         
         return response
 

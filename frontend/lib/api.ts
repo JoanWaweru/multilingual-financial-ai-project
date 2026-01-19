@@ -27,6 +27,7 @@ export interface ChatResponse {
   user_id: string
   retrieved_documents: number
   sources: Array<{ source: string; similarity: number }>
+  evidence?: Array<{ text: string; source: string; similarity: number }>
   disclaimer?: string
 }
 
@@ -40,6 +41,19 @@ export async function sendMessage(message: string, sessionId: string): Promise<C
 
 export async function getChatHistory(sessionId: string) {
   const response = await api.get(`/api/chat/history/${sessionId}`)
+  return response.data
+}
+
+export async function getChatSessions() {
+  const response = await api.get('/api/chat/sessions')
+  return response.data
+}
+
+export async function exportChat(sessionId: string, format: 'csv' | 'pdf') {
+  const response = await api.get(`/api/chat/export/${sessionId}`, {
+    params: { format },
+    responseType: 'blob',
+  })
   return response.data
 }
 
@@ -71,6 +85,7 @@ export interface AuthResponse {
   user_id: string
   email: string
   full_name?: string
+  role: string
 }
 
 export async function registerUser(email: string, password: string, fullName?: string) {
@@ -92,5 +107,39 @@ export async function loginUser(email: string, password: string) {
 
 export async function getMe() {
   const response = await api.get('/api/auth/me')
+  return response.data
+}
+
+export async function uploadDocument(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  const response = await api.post('/api/documents/ingest', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return response.data
+}
+
+export async function getAdminOverview() {
+  const response = await api.get('/api/admin/overview')
+  return response.data
+}
+
+export async function getAdminFeedback() {
+  const response = await api.get('/api/admin/feedback')
+  return response.data
+}
+
+export async function getEvalMetrics() {
+  const response = await api.get('/api/eval/code-switch')
+  return response.data
+}
+
+export async function submitFeedback(sessionId: string, rating: number, comment?: string, messageId?: number) {
+  const response = await api.post('/api/feedback', {
+    session_id: sessionId,
+    message_id: messageId,
+    rating,
+    comment,
+  })
   return response.data
 }

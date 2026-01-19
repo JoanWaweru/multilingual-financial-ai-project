@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { Wallet, Globe } from 'lucide-react'
 import AuthControls from './AuthControls'
 
@@ -23,6 +24,12 @@ export default function Header() {
             <div className="flex items-center space-x-2 text-sm text-gray-600">
               <Globe className="w-4 h-4" />
               <span>English / Kiswahili</span>
+            </div>
+            <div className="flex items-center space-x-4 text-xs text-gray-600">
+              <Link href="/profile" className="hover:text-gray-900">My Profile</Link>
+              <Link href="/documents" className="hover:text-gray-900">Documents</Link>
+              <Link href="/evaluation" className="hover:text-gray-900">Evaluation</Link>
+              <Link href="/admin" className="hover:text-gray-900">Admin</Link>
             </div>
             <AuthControls />
           </div>

@@ -14,6 +14,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=True)
     password_hash = Column(String, nullable=True)
     full_name = Column(String, nullable=True)
+    role = Column(String, default="user", index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_active = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     

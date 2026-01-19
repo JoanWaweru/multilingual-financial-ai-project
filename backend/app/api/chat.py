@@ -2,6 +2,7 @@
 Chat API endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +10,7 @@ from app.core.database import get_db
 from app.services.rag_service import rag_service
 from app.services.memory_service import memory_service
 from app.core.config import settings
-from app.services.auth_service import get_current_user_optional
+from app.services.auth_service import get_current_user_optional, get_current_user
 
 router = APIRouter()
 
@@ -25,6 +26,7 @@ class ChatResponse(BaseModel):
     user_id: str
     retrieved_documents: int
     sources: List[Dict]
+    evidence: List[Dict] = []
     disclaimer: Optional[str] = None
 
 @router.post("/", response_model=ChatResponse)
@@ -75,7 +77,8 @@ async def chat(
             rag_response['response'],
             metadata={
                 'confidence': rag_response['confidence'],
-                'sources': rag_response.get('sources', [])
+                'sources': rag_response.get('sources', []),
+                'evidence': rag_response.get('evidence', [])
             },
             db=db
         )
@@ -92,6 +95,7 @@ async def chat(
             user_id=user.id,
             retrieved_documents=rag_response.get('retrieved_documents', 0),
             sources=rag_response.get('sources', []),
+            evidence=rag_response.get('evidence', []),
             disclaimer=disclaimer
         )
     
@@ -102,11 +106,15 @@ async def chat(
 async def get_history(
     session_id: str,
     limit: Optional[int] = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user_optional)
 ):
     """Get chat history for a session"""
     try:
-        user = await memory_service.get_or_create_user(session_id, db)
+        if current_user:
+            user = current_user
+        else:
+            user = await memory_service.get_or_create_user(session_id, db)
         history = await memory_service.get_chat_history(
             user.id,
             session_id,
@@ -116,4 +124,58 @@ async def get_history(
         return {"history": history}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/sessions")
+async def list_sessions(
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    sessions = await memory_service.get_user_sessions(current_user.id, db)
+    return {"sessions": sessions}
+
+
+@router.get("/export/{session_id}")
+async def export_session(
+    session_id: str,
+    format: str = "csv",
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    history = await memory_service.get_chat_history(
+        current_user.id,
+        session_id,
+        limit=1000,
+        db=db
+    )
+    if format not in ("csv", "pdf"):
+        raise HTTPException(status_code=400, detail="format must be csv or pdf")
+
+    if format == "csv":
+        import csv
+        from io import StringIO
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["role", "message"])
+        for item in history:
+            writer.writerow([item.get("role"), item.get("message")])
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=chat_{session_id}.csv"}
+        )
+
+    from fpdf import FPDF
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(0, 10, f"Chat Session: {session_id}", ln=True)
+    for item in history:
+        line = f"{item.get('role')}: {item.get('message')}"
+        pdf.multi_cell(0, 8, line)
+    return StreamingResponse(
+        iter([pdf.output(dest="S").encode("latin-1")]),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=chat_{session_id}.pdf"}
+    )
 

@@ -80,6 +80,26 @@ class MemoryService:
             })
         
         return formatted
+
+    async def get_user_sessions(self, user_id: str, db: AsyncSession) -> List[Dict]:
+        """Return session summaries for a user."""
+        result = await db.execute(
+            select(ChatHistory)
+            .where(ChatHistory.user_id == user_id)
+            .order_by(ChatHistory.created_at.desc())
+        )
+        entries = result.scalars().all()
+        sessions = {}
+        for entry in entries:
+            if entry.session_id in sessions:
+                continue
+            sessions[entry.session_id] = {
+                "session_id": entry.session_id,
+                "last_message": entry.message,
+                "last_role": entry.role,
+                "last_updated": entry.created_at.isoformat() if entry.created_at else None
+            }
+        return list(sessions.values())
     
     async def clear_chat_history(
         self,

@@ -37,6 +37,7 @@ class AuthResponse(BaseModel):
     user_id: str
     email: EmailStr
     full_name: Optional[str] = None
+    role: str
 
 
 @router.post("/register", response_model=AuthResponse)
@@ -50,7 +51,8 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
         access_token=token,
         user_id=user.id,
         email=user.email,
-        full_name=user.full_name
+        full_name=user.full_name,
+        role=user.role
     )
 
 
@@ -66,7 +68,8 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
         access_token=token,
         user_id=user.id,
         email=user.email,
-        full_name=user.full_name
+        full_name=user.full_name,
+        role=user.role
     )
 
 
@@ -75,5 +78,6 @@ async def me(current_user=Depends(get_current_user)):
     return {
         "user_id": current_user.id,
         "email": current_user.email,
-        "full_name": current_user.full_name
+        "full_name": current_user.full_name,
+        "role": current_user.role
     }

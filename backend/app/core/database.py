@@ -42,7 +42,7 @@ async def get_db():
 
 async def init_db():
     """Initialize database tables"""
-    from app.models import user, chat_history, user_preferences
+    from app.models import user, chat_history, user_preferences, feedback
     
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

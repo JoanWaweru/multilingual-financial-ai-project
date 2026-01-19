@@ -9,6 +9,7 @@ import json
 import sys
 from pathlib import Path
 from typing import Dict
+from datetime import datetime
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -17,6 +18,17 @@ if str(ROOT) not in sys.path:
 from app.core.config import settings
 from app.services.llm_service import llm_service
 from app.utils.code_switching_eval import evaluate_responses
+
+
+def _append_metrics(root: Path, mode: str, metrics: Dict):
+    log_path = root / "data" / "code_switching_metrics_log.jsonl"
+    entry = {
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "mode": mode,
+        "metrics": metrics
+    }
+    with log_path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry) + "\n")
 
 
 def load_json(path: Path):
@@ -57,6 +69,7 @@ async def main():
         metrics = evaluate_responses(prompts, responses)
         print("With constraint metrics")
         print(json.dumps(metrics, indent=2))
+        _append_metrics(root, "with_constraint", metrics)
 
     if args.mode in ("without", "both"):
         responses = await generate(prompts, enable_constraint=False)
@@ -65,6 +78,7 @@ async def main():
         metrics = evaluate_responses(prompts, responses)
         print("Without constraint metrics")
         print(json.dumps(metrics, indent=2))
+        _append_metrics(root, "without_constraint", metrics)
 
 
 if __name__ == "__main__":

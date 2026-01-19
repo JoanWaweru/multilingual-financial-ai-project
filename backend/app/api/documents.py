@@ -1,10 +1,11 @@
 """
 Document management API endpoints
 """
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
 from typing import List
 from app.services.vector_store import vector_store
 from app.utils.document_processor import DocumentProcessor
+from app.services.auth_service import require_roles
 
 router = APIRouter()
 
@@ -16,7 +17,8 @@ async def get_document_stats():
 
 @router.post("/ingest")
 async def ingest_documents(
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    current_user = Depends(require_roles(["admin", "moderator"]))
 ):
     """Ingest a document into the vector store"""
     try:

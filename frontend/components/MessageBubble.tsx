@@ -1,10 +1,15 @@
 'use client'
 
-import { User, Bot, ExternalLink } from 'lucide-react'
+import { useState } from 'react'
+import { User, Bot, ExternalLink, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { Message } from '@/types'
+import { submitFeedback } from '@/lib/api'
 
 interface MessageBubbleProps {
-  message: Message
+  message: Message & {
+    evidence?: Array<{ text: string; source: string; similarity: number }>
+  }
+  sessionId: string
 }
 
 function formatAssistantMessage(text: string): { __html: string } {
@@ -26,9 +31,10 @@ function formatAssistantMessage(text: string): { __html: string } {
   return { __html: withLineBreaks }
 }
 
-export default function MessageBubble({ message }: MessageBubbleProps) {
+export default function MessageBubble({ message, sessionId }: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const formattedContent = !isUser ? formatAssistantMessage(message.content) : null
+  const [feedbackSent, setFeedbackSent] = useState(false)
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -67,6 +73,47 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
                   </div>
                 )}
               </div>
+              {!feedbackSent && (
+                <div className="mt-2 flex items-center space-x-2 text-xs text-gray-600">
+                  <span>Helpful?</span>
+                  <button
+                    onClick={async () => {
+                      await submitFeedback(sessionId, 5)
+                      setFeedbackSent(true)
+                    }}
+                    className="flex items-center space-x-1 hover:text-gray-900"
+                  >
+                    <ThumbsUp className="w-3 h-3" />
+                    <span>Yes</span>
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await submitFeedback(sessionId, 2)
+                      setFeedbackSent(true)
+                    }}
+                    className="flex items-center space-x-1 hover:text-gray-900"
+                  >
+                    <ThumbsDown className="w-3 h-3" />
+                    <span>No</span>
+                  </button>
+                </div>
+              )}
+              {feedbackSent && (
+                <div className="mt-2 text-xs text-gray-500">Thanks for your feedback.</div>
+              )}
+              {message.evidence && message.evidence.length > 0 && (
+                <details className="mt-2 text-xs text-gray-600">
+                  <summary className="cursor-pointer">Evidence snippets</summary>
+                  <div className="mt-2 space-y-2">
+                    {message.evidence.map((item, idx) => (
+                      <div key={idx} className="border border-gray-200 rounded p-2">
+                        <div className="font-medium">{item.source}</div>
+                        <div className="mt-1">{item.text}</div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
             </div>
           )}
         </div>

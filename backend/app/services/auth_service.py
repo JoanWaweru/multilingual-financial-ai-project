@@ -89,12 +89,23 @@ async def get_current_user_optional(
     return await get_user_by_id(db, user_id)
 
 
+def require_roles(roles: list[str]):
+    async def _dependency(
+        current_user: User = Depends(get_current_user),
+    ) -> User:
+        if current_user.role not in roles:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        return current_user
+    return _dependency
+
+
 async def create_user(db: AsyncSession, email: str, password: str, full_name: Optional[str] = None) -> User:
     user = User(
         email=email,
         password_hash=hash_password(password),
         full_name=full_name,
-        session_id=str(uuid4())
+        session_id=str(uuid4()),
+        role="user"
     )
     db.add(user)
     await db.commit()

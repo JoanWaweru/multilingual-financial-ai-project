@@ -217,6 +217,19 @@ python scripts/evaluate_code_switching.py
 4. Add analytics and monitoring
 5. Deploy to production (Vercel, Render, Railway, etc.)
 
+## Auth and Roles
+
+By default, new users are created with role `user`. To access admin pages or document ingestion:
+- Set a user role to `admin` or `moderator` in the database.
+- Restart the backend after making changes.
+
+## UI Pages
+
+- `/profile` shows your chats and export options.
+- `/documents` allows document upload (admin/moderator).
+- `/evaluation` shows code-switch metrics history.
+- `/admin` shows analytics and feedback (admin only).
+
 ## Support
 
 For issues or questions, check the README.md or review the code documentation.

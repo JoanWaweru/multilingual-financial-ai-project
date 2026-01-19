@@ -21,6 +21,7 @@ interface Message {
   timestamp: Date
   confidence?: number
   sources?: Array<{ source: string; similarity: number }>
+  evidence?: Array<{ text: string; source: string; similarity: number }>
 }
 
 export default function ChatInterface() {
@@ -53,6 +54,9 @@ export default function ChatInterface() {
           role: msg.role,
           content: msg.message,
           timestamp: new Date(),
+          confidence: msg.metadata?.confidence,
+          sources: msg.metadata?.sources,
+          evidence: msg.metadata?.evidence,
         }))
         setMessages(formattedMessages)
       }
@@ -85,6 +89,7 @@ export default function ChatInterface() {
         timestamp: new Date(),
         confidence: response.confidence,
         sources: response.sources,
+        evidence: response.evidence,
       }
 
       setMessages((prev) => [...prev, assistantMessage])
@@ -151,7 +156,7 @@ export default function ChatInterface() {
           </div>
         )}
         {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} />
+          <MessageBubble key={message.id} message={message} sessionId={sessionId} />
         ))}
         {isLoading && (
           <div className="flex items-center space-x-2 text-gray-500">

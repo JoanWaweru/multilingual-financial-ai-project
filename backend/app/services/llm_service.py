@@ -70,6 +70,12 @@ RESPONSE GUIDELINES:
                 "role": "system",
                 "content": f"User preferences and context:\n{pref_text}"
             })
+            risk_level = user_preferences.get("risk_level")
+            if risk_level:
+                messages.append({
+                    "role": "system",
+                    "content": self._risk_guardrail(risk_level)
+                })
         
         # Add retrieved context from RAG
         if context:
@@ -253,6 +259,23 @@ If you continue to see this error, please contact your system administrator."""
         if preferences.get('goals'):
             parts.append(f"Financial goals: {preferences['goals']}")
         return "\n".join(parts) if parts else "No specific preferences set."
+
+    def _risk_guardrail(self, risk_level: str) -> str:
+        level = str(risk_level).lower()
+        if level in {"low", "conservative"}:
+            return (
+                "User has low risk tolerance. Avoid recommending high-risk assets or speculative strategies. "
+                "Prioritize capital preservation and liquidity."
+            )
+        if level in {"medium", "balanced"}:
+            return (
+                "User has medium risk tolerance. Offer balanced options and explain trade-offs."
+            )
+        if level in {"high", "aggressive"}:
+            return (
+                "User has high risk tolerance. You may discuss higher-risk options but still include risk warnings."
+            )
+        return "User risk tolerance is set; align advice accordingly."
 
 
     
