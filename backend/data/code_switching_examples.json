@@ -1,0 +1,62 @@
+[
+  {
+    "id": "en-001",
+    "expected_style": "english",
+    "prompt": "I have 100k KES. Where should I invest for moderate risk and steady returns?"
+  },
+  {
+    "id": "en-002",
+    "expected_style": "english",
+    "prompt": "Explain Treasury Bills vs Money Market Funds for a beginner."
+  },
+  {
+    "id": "sw-001",
+    "expected_style": "kiswahili",
+    "prompt": "Nina KSh 50,000. Naweza kuwekeza wapi kwa faida ya wastani?"
+  },
+  {
+    "id": "sw-002",
+    "expected_style": "kiswahili",
+    "prompt": "Nisaidie kupanga bajeti yangu ya kila mwezi."
+  },
+  {
+    "id": "cs-001",
+    "expected_style": "code-switch",
+    "prompt": "Nina 100k, naomba advice niweke wapi for good returns lakini si high risk."
+  },
+  {
+    "id": "cs-002",
+    "expected_style": "code-switch",
+    "prompt": "Explain MMF ni nini na how it compares to savings account."
+  },
+  {
+    "id": "en-003",
+    "expected_style": "english",
+    "prompt": "What are the risks of investing in NSE shares?"
+  },
+  {
+    "id": "sw-003",
+    "expected_style": "kiswahili",
+    "prompt": "SACCO ni nini na ina faida gani?"
+  },
+  {
+    "id": "cs-003",
+    "expected_style": "code-switch",
+    "prompt": "Nimekuwa nikisave but sijui best plan. Can you suggest options?"
+  },
+  {
+    "id": "cs-004",
+    "expected_style": "code-switch",
+    "prompt": "Nataka kuanza investing, but sina experience. Unashauri nini?"
+  },
+  {
+    "id": "en-004",
+    "expected_style": "english",
+    "prompt": "How do pension funds work in Kenya?"
+  },
+  {
+    "id": "sw-004",
+    "expected_style": "kiswahili",
+    "prompt": "Toa ushauri wa kuweka akiba ya dharura."
+  }
+]

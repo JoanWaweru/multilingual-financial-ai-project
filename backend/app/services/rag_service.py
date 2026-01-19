@@ -33,6 +33,12 @@ class RAGService:
                 'metadata': metadata,
                 'similarity_score': 1.0 / (1.0 + distance)  # Convert distance to similarity
             })
+        
+        if settings.min_context_similarity and settings.min_context_similarity > 0:
+            context = [
+                item for item in context
+                if item['similarity_score'] >= settings.min_context_similarity
+            ]
 
         # Add live market snapshot when query is market-related
         if self._is_market_query(query):
@@ -73,6 +79,7 @@ class RAGService:
         ]
         
         return response
+
 
     def _is_market_query(self, query: str) -> bool:
         q = query.lower()

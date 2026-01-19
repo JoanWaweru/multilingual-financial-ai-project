@@ -30,6 +30,14 @@
    # You can pass multiple categories, comma-separated
    NSE_MARKET_CATEGORY=banking,agriculture,etf
    NSE_MARKET_CACHE_TTL_SECONDS=900
+   
+   # Optional: disable language-style constraint for A/B comparison
+   ENABLE_LANGUAGE_STYLE_CONSTRAINT=true
+   # Optional: lower temperature for eval runs (set to null to disable override)
+   EVAL_TEMPERATURE_OVERRIDE=0.2
+   # Optional: retry once if the response violates language style
+   LANGUAGE_STYLE_RETRY_ENABLED=true
+   LANGUAGE_STYLE_RETRY_MAX=1
    ```
    
    Create `frontend/.env.local`:
@@ -139,6 +147,21 @@
    - Ask questions in English
    - Ask questions in Kiswahili
    - Mix both languages (code-switching)
+
+## Code-Switching Evaluation
+
+Generate evaluation responses (requires `OPENAI_API_KEY`):
+
+```bash
+cd backend
+python scripts/generate_code_switching_responses.py --mode both
+```
+
+Run prompt-only metrics:
+
+```bash
+python scripts/evaluate_code_switching.py
+```
 
 ## Project Structure
 

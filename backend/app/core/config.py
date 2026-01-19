@@ -33,9 +33,17 @@ class Settings(BaseSettings):
     # Safety & Ethics
     disclaimer_enabled: bool = True
     confidence_threshold: float = 0.6
+    require_citations: bool = False
+    min_context_similarity: float = 0.0
     
     # Local Embeddings (fallback when OpenAI quota is exceeded)
     use_local_embeddings: bool = False
+
+    # Code-switching constraints
+    enable_language_style_constraint: bool = True
+    eval_temperature_override: Optional[float] = 0.2
+    language_style_retry_enabled: bool = True
+    language_style_retry_max: int = 1
 
     # Live Market Data (optional)
     nse_market_data_url: Optional[str] = None

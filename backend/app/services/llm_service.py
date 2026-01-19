@@ -4,8 +4,8 @@ LLM service for generating responses using OpenAI or Anthropic
 from openai import OpenAI, RateLimitError, APIError
 from typing import List, Dict, Optional
 from app.core.config import settings
+from app.utils.language_detection import detect_language_style, language_style_instruction, is_code_switch_compliant
 import json
-import re
 
 class LLMService:
     """Service for LLM interactions"""
@@ -58,6 +58,11 @@ RESPONSE GUIDELINES:
         
         messages = [{"role": "system", "content": self._build_system_prompt()}]
         
+        # Detect expected language style early
+        expected_style = None
+        if settings.enable_language_style_constraint:
+            expected_style = detect_language_style(user_message)
+
         # Add user preferences context if available
         if user_preferences:
             pref_text = self._format_preferences(user_preferences)
@@ -98,22 +103,83 @@ RESPONSE GUIDELINES:
                 })
         
         # Add current user message
-        language_style = self._detect_language_style(user_message)
-        messages.append({
-            "role": "system",
-            "content": self._language_style_instruction(language_style)
-        })
+        if settings.enable_language_style_constraint:
+            messages.append({
+                "role": "system",
+                "content": language_style_instruction(expected_style)
+            })
+            if expected_style == "code-switch":
+                messages.append({
+                    "role": "system",
+                    "content": (
+                        "Use code-switching: include at least one full English sentence and "
+                        "at least one full Kiswahili sentence. Use short paragraphs, no lists."
+                    )
+                })
+            else:
+                messages.append({
+                    "role": "system",
+                    "content": (
+                        "Do not mix languages unless the user mixes languages. "
+                        "If the user writes only English, respond only in English. "
+                        "If the user writes only Kiswahili, respond only in Kiswahili. "
+                        "Do not use numbered or bulleted lists."
+                    )
+                })
         messages.append({"role": "user", "content": user_message})
         
         try:
+            temperature = self.temperature
+            if settings.enable_language_style_constraint and settings.eval_temperature_override is not None:
+                temperature = settings.eval_temperature_override
+
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                temperature=self.temperature,
+                temperature=temperature,
                 max_tokens=self.max_tokens
             )
             
             content = response.choices[0].message.content
+            retry_count = 0
+            if (
+                settings.enable_language_style_constraint
+                and settings.language_style_retry_enabled
+                and expected_style is not None
+            ):
+                while retry_count < settings.language_style_retry_max:
+                    if expected_style == "code-switch":
+                        if is_code_switch_compliant(content):
+                            break
+                    elif detect_language_style(content) == expected_style:
+                        break
+                    retry_count += 1
+                    retry_messages = list(messages)
+                    retry_messages.append({"role": "assistant", "content": content})
+                    retry_instruction = (
+                        "Your previous response did not follow the language constraint. "
+                        "Rewrite it to match the required language style only, keep the meaning."
+                    )
+                    if expected_style == "code-switch":
+                        retry_instruction = (
+                            "Rewrite the response using code-switching with at least one full English "
+                            "sentence and one full Kiswahili sentence. Use short paragraphs, no lists. "
+                            "Keep the meaning."
+                        )
+                    retry_messages.append({
+                        "role": "system",
+                        "content": retry_instruction
+                    })
+                    retry_messages.append({"role": "user", "content": "Rewrite the response now."})
+
+                    retry_response = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=retry_messages,
+                        temperature=temperature,
+                        max_tokens=self.max_tokens
+                    )
+                    content = retry_response.choices[0].message.content
+
             
             # Calculate confidence (simple heuristic based on response length and structure)
             confidence = self._calculate_confidence(content, context)
@@ -188,48 +254,7 @@ If you continue to see this error, please contact your system administrator."""
             parts.append(f"Financial goals: {preferences['goals']}")
         return "\n".join(parts) if parts else "No specific preferences set."
 
-    def _detect_language_style(self, text: str) -> str:
-        """Heuristic detector for English/Kiswahili/code-switch."""
-        tokens = re.findall(r"[a-z']+", text.lower())
-        if not tokens:
-            return "english"
 
-        sw_words = {
-            "na", "ya", "kwa", "kwenye", "ni", "sio", "si", "wewe", "mimi", "yako",
-            "yangu", "wako", "wangu", "hii", "hizo", "hayo", "huyu", "wapi", "nini",
-            "nime", "una", "nina", "kuwa", "kuna", "pesa", "uwekezaji", "sacco",
-            "sasa", "kabisa", "tafadhali", "karibu", "tumia", "fanya", "sababu",
-            "muda", "mrefu", "hatari", "faida", "akaunti", "benki", "bonds", "t-bills"
-        }
-        en_words = {
-            "the", "and", "for", "with", "that", "this", "you", "your", "i", "we",
-            "should", "can", "could", "would", "please", "invest", "investment",
-            "return", "risk", "money", "savings", "account", "bank", "bonds", "bills"
-        }
-
-        sw_hits = sum(1 for t in tokens if t in sw_words)
-        en_hits = sum(1 for t in tokens if t in en_words)
-
-        # If both show up, treat as code-switch when overlap is meaningful
-        if sw_hits > 0 and en_hits > 0:
-            if min(sw_hits, en_hits) >= 2 or (sw_hits + en_hits) >= 4:
-                return "code-switch"
-
-        if sw_hits > en_hits:
-            return "kiswahili"
-        if en_hits > sw_hits:
-            return "english"
-
-        # Fallback: if many Swahili-like tokens (e.g., ending with vowels), lean Swahili
-        vowel_ending = sum(1 for t in tokens if t[-1] in "aeiou")
-        return "kiswahili" if vowel_ending >= max(3, len(tokens) // 2) else "english"
-
-    def _language_style_instruction(self, style: str) -> str:
-        if style == "kiswahili":
-            return "Reply in Kiswahili only."
-        if style == "code-switch":
-            return "Reply in a code-switched mix of English and Kiswahili, matching the user's mix and tone."
-        return "Reply in English only."
     
     def _calculate_confidence(self, response: str, context: List[Dict]) -> float:
         """Calculate confidence score for the response"""
