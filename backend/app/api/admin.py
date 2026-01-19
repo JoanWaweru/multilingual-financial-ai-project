@@ -55,10 +55,12 @@ async def update_user_role(
     user_id: str,
     role: str,
     db: AsyncSession = Depends(get_db),
-    current_user = Depends(require_roles(["admin"]))
+    current_user = Depends(require_roles(["admin", "moderator"]))
 ):
     if role not in {"user", "admin", "moderator"}:
         return {"status": "error", "message": "Invalid role"}
+    if current_user.role == "moderator" and role == "admin":
+        return {"status": "error", "message": "Moderators cannot assign admin role"}
     user = await db.get(User, user_id)
     if not user:
         return {"status": "error", "message": "User not found"}

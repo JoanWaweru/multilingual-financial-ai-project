@@ -6,6 +6,9 @@ from sqlalchemy import select, update, delete
 from typing import List, Dict, Optional
 from app.models.user import User
 from app.models.chat_history import ChatHistory
+from app.models.chat_session import ChatSession
+from app.services.llm_service import llm_service
+from datetime import datetime
 from app.models.user_preferences import UserPreferences
 from app.core.config import settings
 import json
@@ -39,6 +42,9 @@ class MemoryService:
         db: AsyncSession = None
     ):
         """Save a chat message to history"""
+        await self.get_or_create_session(user_id, session_id, db)
+        await self._update_session_from_message(user_id, session_id, role, message, db)
+
         chat_entry = ChatHistory(
             user_id=user_id,
             session_id=session_id,
@@ -84,22 +90,92 @@ class MemoryService:
     async def get_user_sessions(self, user_id: str, db: AsyncSession) -> List[Dict]:
         """Return session summaries for a user."""
         result = await db.execute(
-            select(ChatHistory)
-            .where(ChatHistory.user_id == user_id)
-            .order_by(ChatHistory.created_at.desc())
+            select(ChatSession)
+            .where(ChatSession.user_id == user_id, ChatSession.deleted_at.is_(None))
+            .order_by(ChatSession.pinned.desc(), ChatSession.last_updated.desc())
         )
-        entries = result.scalars().all()
-        sessions = {}
-        for entry in entries:
-            if entry.session_id in sessions:
-                continue
-            sessions[entry.session_id] = {
-                "session_id": entry.session_id,
-                "last_message": entry.message,
-                "last_role": entry.role,
-                "last_updated": entry.created_at.isoformat() if entry.created_at else None
+        sessions = result.scalars().all()
+        return [
+            {
+                "session_id": s.session_id,
+                "title": s.title or "",
+                "summary": s.summary or "",
+                "last_message": s.last_message or "",
+                "last_role": s.last_role or "",
+                "pinned": bool(s.pinned),
+                "last_updated": s.last_updated.isoformat() if s.last_updated else None
             }
-        return list(sessions.values())
+            for s in sessions
+        ]
+
+    async def get_or_create_session(self, user_id: str, session_id: str, db: AsyncSession) -> ChatSession:
+        result = await db.execute(
+            select(ChatSession).where(ChatSession.session_id == session_id)
+        )
+        session = result.scalar_one_or_none()
+        if session:
+            return session
+        session = ChatSession(user_id=user_id, session_id=session_id, title=None)
+        db.add(session)
+        await db.commit()
+        await db.refresh(session)
+        return session
+
+    async def rename_session(self, user_id: str, session_id: str, title: str, db: AsyncSession) -> None:
+        result = await db.execute(
+            select(ChatSession).where(ChatSession.session_id == session_id, ChatSession.user_id == user_id)
+        )
+        session = result.scalar_one_or_none()
+        if not session:
+            return
+        session.title = title.strip()[:80] if title else session.title
+        await db.commit()
+
+    async def pin_session(self, user_id: str, session_id: str, pinned: bool, db: AsyncSession) -> None:
+        result = await db.execute(
+            select(ChatSession).where(ChatSession.session_id == session_id, ChatSession.user_id == user_id)
+        )
+        session = result.scalar_one_or_none()
+        if not session:
+            return
+        session.pinned = bool(pinned)
+        await db.commit()
+
+    async def soft_delete_session(self, user_id: str, session_id: str, db: AsyncSession) -> None:
+        result = await db.execute(
+            select(ChatSession).where(ChatSession.session_id == session_id, ChatSession.user_id == user_id)
+        )
+        session = result.scalar_one_or_none()
+        if not session:
+            return
+        session.deleted_at = datetime.utcnow()
+        await db.commit()
+
+    async def _update_session_from_message(
+        self,
+        user_id: str,
+        session_id: str,
+        role: str,
+        message: str,
+        db: AsyncSession
+    ) -> None:
+        result = await db.execute(
+            select(ChatSession).where(ChatSession.session_id == session_id, ChatSession.user_id == user_id)
+        )
+        session = result.scalar_one_or_none()
+        if not session:
+            return
+        if not session.title and role == "user":
+            session.title = await llm_service.summarize_session_title(message)
+        if not session.summary and role == "user":
+            session.summary = session.title or self._summarize_title(message)
+        session.last_message = message
+        session.last_role = role
+        await db.commit()
+
+    def _summarize_title(self, message: str) -> str:
+        trimmed = " ".join(message.strip().split())
+        return trimmed[:60] + ("..." if len(trimmed) > 60 else "")
     
     async def clear_chat_history(
         self,

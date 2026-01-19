@@ -277,6 +277,27 @@ If you continue to see this error, please contact your system administrator."""
             )
         return "User risk tolerance is set; align advice accordingly."
 
+    async def summarize_session_title(self, message: str) -> str:
+        """Generate a short session title (4-6 words)."""
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Summarize the message into a 4-6 word title. No punctuation."
+                    },
+                    {"role": "user", "content": message.strip()}
+                ],
+                temperature=0.2,
+                max_tokens=20
+            )
+            title = response.choices[0].message.content.strip()
+            return " ".join(title.split())[:60]
+        except Exception:
+            trimmed = " ".join(message.strip().split())
+            return trimmed[:60] + ("..." if len(trimmed) > 60 else "")
+
 
     
     def _calculate_confidence(self, response: str, context: List[Dict]) -> float:

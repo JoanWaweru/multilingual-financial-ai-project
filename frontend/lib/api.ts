@@ -57,6 +57,21 @@ export async function exportChat(sessionId: string, format: 'csv' | 'pdf') {
   return response.data
 }
 
+export async function renameChat(sessionId: string, title: string) {
+  const response = await api.post(`/api/chat/sessions/${sessionId}/rename`, { title })
+  return response.data
+}
+
+export async function pinChat(sessionId: string, pinned: boolean) {
+  const response = await api.post(`/api/chat/sessions/${sessionId}/pin`, { pinned })
+  return response.data
+}
+
+export async function deleteChat(sessionId: string) {
+  const response = await api.delete(`/api/chat/sessions/${sessionId}`)
+  return response.data
+}
+
 export async function clearChat(sessionId: string, clearType: 'chat' | 'preferences' | 'all' = 'chat') {
   const response = await api.post('/api/memory/clear', {
     session_id: sessionId,

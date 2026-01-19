@@ -74,6 +74,37 @@ def main():
         """
     )
 
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS chat_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            session_id TEXT UNIQUE,
+            title TEXT,
+            summary TEXT,
+            last_message TEXT,
+            last_role TEXT,
+            pinned INTEGER DEFAULT 0,
+            deleted_at TIMESTAMP,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+    for column, ddl in [
+        ("title", "ALTER TABLE chat_sessions ADD COLUMN title TEXT"),
+        ("summary", "ALTER TABLE chat_sessions ADD COLUMN summary TEXT"),
+        ("last_message", "ALTER TABLE chat_sessions ADD COLUMN last_message TEXT"),
+        ("last_role", "ALTER TABLE chat_sessions ADD COLUMN last_role TEXT"),
+        ("pinned", "ALTER TABLE chat_sessions ADD COLUMN pinned INTEGER DEFAULT 0"),
+        ("deleted_at", "ALTER TABLE chat_sessions ADD COLUMN deleted_at TIMESTAMP"),
+        ("last_updated", "ALTER TABLE chat_sessions ADD COLUMN last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+        ("created_at", "ALTER TABLE chat_sessions ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    ]:
+        if not _column_exists(cursor, "chat_sessions", column):
+            cursor.execute(ddl)
+
     conn.commit()
     conn.close()
     print("✅ Migration complete.")

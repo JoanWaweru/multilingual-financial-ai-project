@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getChatSessions, exportChat, getMe } from '@/lib/api'
+import { getChatSessions, exportChat, getMe, renameChat } from '@/lib/api'
 
 interface SessionSummary {
   session_id: string
+  title?: string
+  summary?: string
   last_message: string
   last_role: string
   last_updated?: string
@@ -14,6 +16,8 @@ export default function ProfilePage() {
   const [me, setMe] = useState<any>(null)
   const [sessions, setSessions] = useState<SessionSummary[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
 
   useEffect(() => {
     const load = async () => {
@@ -60,7 +64,7 @@ export default function ProfilePage() {
               {sessions.map((session) => (
                 <div key={session.session_id} className="border border-gray-200 rounded p-3">
                   <div className="text-sm text-gray-700">
-                    Session: {session.session_id}
+                    {session.title || session.summary || session.last_message}
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
                     Last updated: {session.last_updated}
@@ -71,6 +75,38 @@ export default function ProfilePage() {
                   <div className="mt-3 flex items-center space-x-2">
                     <ExportButton sessionId={session.session_id} format="csv" />
                     <ExportButton sessionId={session.session_id} format="pdf" />
+                    {renamingId === session.session_id ? (
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="text"
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          className="border border-gray-300 rounded px-2 py-1 text-xs"
+                        />
+                        <button
+                          onClick={async () => {
+                            await renameChat(session.session_id, renameValue)
+                            setRenamingId(null)
+                            setRenameValue('')
+                            const data = await getChatSessions()
+                            setSessions(data.sessions || [])
+                          }}
+                          className="text-xs text-primary-600"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setRenamingId(session.session_id)
+                          setRenameValue(session.title || session.summary || session.last_message)
+                        }}
+                        className="text-xs text-gray-600 hover:text-gray-900"
+                      >
+                        Rename
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

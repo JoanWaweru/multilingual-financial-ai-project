@@ -135,6 +135,46 @@ async def list_sessions(
     return {"sessions": sessions}
 
 
+class RenameRequest(BaseModel):
+    title: str
+
+
+@router.post("/sessions/{session_id}/rename")
+async def rename_session(
+    session_id: str,
+    request: RenameRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    await memory_service.rename_session(current_user.id, session_id, request.title, db)
+    return {"status": "success"}
+
+
+class PinRequest(BaseModel):
+    pinned: bool
+
+
+@router.post("/sessions/{session_id}/pin")
+async def pin_session(
+    session_id: str,
+    request: PinRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    await memory_service.pin_session(current_user.id, session_id, request.pinned, db)
+    return {"status": "success"}
+
+
+@router.delete("/sessions/{session_id}")
+async def delete_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    await memory_service.soft_delete_session(current_user.id, session_id, db)
+    return {"status": "success"}
+
+
 @router.get("/export/{session_id}")
 async def export_session(
     session_id: str,
