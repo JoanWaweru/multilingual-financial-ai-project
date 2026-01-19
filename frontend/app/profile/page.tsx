@@ -74,7 +74,6 @@ export default function ProfilePage() {
                   </div>
                   <div className="mt-3 flex items-center space-x-2">
                     <ExportButton sessionId={session.session_id} format="csv" />
-                    <ExportButton sessionId={session.session_id} format="pdf" />
                     {renamingId === session.session_id ? (
                       <div className="flex items-center space-x-2">
                         <input
@@ -118,7 +117,7 @@ export default function ProfilePage() {
   )
 }
 
-function ExportButton({ sessionId, format }: { sessionId: string; format: 'csv' | 'pdf' }) {
+function ExportButton({ sessionId, format }: { sessionId: string; format: 'csv' }) {
   const label = format.toUpperCase()
   return (
     <button

@@ -212,9 +212,20 @@ async def export_session(
     pdf.cell(0, 10, f"Chat Session: {session_id}", ln=True)
     for item in history:
         line = f"{item.get('role')}: {item.get('message')}"
-        pdf.multi_cell(0, 8, line)
+        line = line.replace("\t", " ").replace("\r", " ")
+        line = " ".join(line.split())
+        if not line:
+            continue
+        try:
+            pdf.multi_cell(0, 8, line)
+        except Exception:
+            safe_line = (line[:3000] + "...") if len(line) > 3000 else line
+            pdf.multi_cell(0, 8, safe_line)
+    pdf_bytes = pdf.output(dest="S")
+    if isinstance(pdf_bytes, str):
+        pdf_bytes = pdf_bytes.encode("latin-1")
     return StreamingResponse(
-        iter([pdf.output(dest="S").encode("latin-1")]),
+        iter([pdf_bytes]),
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename=chat_{session_id}.pdf"}
     )
