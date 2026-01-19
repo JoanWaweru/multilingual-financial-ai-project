@@ -129,6 +129,18 @@ export async function getAdminFeedback() {
   return response.data
 }
 
+export async function getAdminUsers() {
+  const response = await api.get('/api/admin/users')
+  return response.data
+}
+
+export async function updateUserRole(userId: string, role: 'user' | 'admin' | 'moderator') {
+  const response = await api.post(`/api/admin/users/${userId}/role`, null, {
+    params: { role },
+  })
+  return response.data
+}
+
 export async function getEvalMetrics() {
   const response = await api.get('/api/eval/code-switch')
   return response.data

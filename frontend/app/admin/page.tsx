@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getAdminOverview, getAdminFeedback } from '@/lib/api'
+import { getAdminOverview, getAdminFeedback, getAdminUsers, updateUserRole } from '@/lib/api'
 
 export default function AdminPage() {
   const [overview, setOverview] = useState<any>(null)
   const [feedback, setFeedback] = useState<any[]>([])
+  const [users, setUsers] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -13,8 +14,10 @@ export default function AdminPage() {
       try {
         const overviewData = await getAdminOverview()
         const feedbackData = await getAdminFeedback()
+        const usersData = await getAdminUsers()
         setOverview(overviewData)
         setFeedback(feedbackData.feedback || [])
+        setUsers(usersData.users || [])
       } catch {
         setError('Admin access required.')
       }
@@ -47,6 +50,38 @@ export default function AdminPage() {
                   {item.comment && <div className="mt-1 text-gray-600">{item.comment}</div>}
                   <div className="mt-1 text-xs text-gray-500">
                     {item.created_at}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded border border-gray-200 p-4">
+            <div className="font-medium">User Roles</div>
+            <div className="mt-3 space-y-3">
+              {users.length === 0 && (
+                <div className="text-sm text-gray-600">No users found.</div>
+              )}
+              {users.map((user) => (
+                <div key={user.id} className="border border-gray-200 rounded p-3 text-sm">
+                  <div>{user.email || user.id}</div>
+                  {user.full_name && <div className="text-gray-600">{user.full_name}</div>}
+                  <div className="mt-2">
+                    <select
+                      value={user.role}
+                      onChange={async (e) => {
+                        const role = e.target.value as 'user' | 'admin' | 'moderator'
+                        await updateUserRole(user.id, role)
+                        setUsers((prev) =>
+                          prev.map((u) => (u.id === user.id ? { ...u, role } : u))
+                        )
+                      }}
+                      className="border border-gray-300 rounded px-2 py-1 text-xs"
+                    >
+                      <option value="user">user</option>
+                      <option value="moderator">moderator</option>
+                      <option value="admin">admin</option>
+                    </select>
                   </div>
                 </div>
               ))}

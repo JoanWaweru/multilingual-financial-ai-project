@@ -29,6 +29,44 @@ async def overview(
     }
 
 
+@router.get("/users")
+async def list_users(
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(require_roles(["admin"]))
+):
+    result = await db.execute(select(User).order_by(User.created_at.desc()).limit(200))
+    users = result.scalars().all()
+    return {
+        "users": [
+            {
+                "id": u.id,
+                "email": u.email,
+                "full_name": u.full_name,
+                "role": u.role,
+                "created_at": u.created_at.isoformat() if u.created_at else None
+            }
+            for u in users
+        ]
+    }
+
+
+@router.post("/users/{user_id}/role")
+async def update_user_role(
+    user_id: str,
+    role: str,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(require_roles(["admin"]))
+):
+    if role not in {"user", "admin", "moderator"}:
+        return {"status": "error", "message": "Invalid role"}
+    user = await db.get(User, user_id)
+    if not user:
+        return {"status": "error", "message": "User not found"}
+    user.role = role
+    await db.commit()
+    return {"status": "success"}
+
+
 @router.get("/feedback")
 async def list_feedback(
     db: AsyncSession = Depends(get_db),

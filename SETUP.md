@@ -223,6 +223,15 @@ By default, new users are created with role `user`. To access admin pages or doc
 - Set a user role to `admin` or `moderator` in the database.
 - Restart the backend after making changes.
 
+## Database Migration
+
+Run the migration script to add new tables/columns without deleting the database:
+
+```bash
+cd backend
+python scripts/migrate_sqlite.py
+```
+
 ## UI Pages
 
 - `/profile` shows your chats and export options.

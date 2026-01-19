@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, Trash2, Settings, Loader2 } from 'lucide-react'
+import { Send, Trash2, Loader2, Plus } from 'lucide-react'
 import MessageBubble from './MessageBubble'
-import { sendMessage, clearChat, getChatHistory } from '@/lib/api'
+import { sendMessage, clearChat, getChatHistory, getChatSessions } from '@/lib/api'
 
 // Simple UUID generator for session IDs
 function generateSessionId(): string {
@@ -28,14 +28,15 @@ export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [sessionId] = useState(() => generateSessionId())
+  const [sessionId, setSessionId] = useState(() => generateSessionId())
+  const [sessions, setSessions] = useState<Array<{ session_id: string; last_message: string; last_updated?: string }>>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    // Load chat history on mount
     loadHistory()
-  }, [])
+    loadSessions()
+  }, [sessionId])
 
   useEffect(() => {
     scrollToBottom()
@@ -62,6 +63,15 @@ export default function ChatInterface() {
       }
     } catch (error) {
       console.error('Error loading history:', error)
+    }
+  }
+
+  const loadSessions = async () => {
+    try {
+      const data = await getChatSessions()
+      setSessions(data.sessions || [])
+    } catch (error) {
+      setSessions([])
     }
   }
 
@@ -119,6 +129,11 @@ export default function ChatInterface() {
     }
   }
 
+  const handleNewChat = () => {
+    setMessages([])
+    setSessionId(generateSessionId())
+  }
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -127,23 +142,57 @@ export default function ChatInterface() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-200px)] bg-white rounded-lg shadow-lg border border-gray-200">
-      {/* Chat Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
-        <h2 className="text-lg font-semibold text-gray-900">Chat</h2>
-        <div className="flex items-center space-x-2">
+    <div className="flex h-[calc(100vh-200px)] bg-white rounded-lg shadow-lg border border-gray-200">
+      {/* Sidebar */}
+      <div className="w-64 border-r border-gray-200 bg-gray-50 p-3 hidden md:block">
+        <div className="flex items-center justify-between">
+          <div className="font-medium text-sm">My Chats</div>
           <button
-            onClick={handleClear}
-            className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-            title="Clear chat"
+            onClick={handleNewChat}
+            className="p-1 rounded hover:bg-gray-200"
+            title="New chat"
           >
-            <Trash2 className="w-5 h-5" />
+            <Plus className="w-4 h-4" />
           </button>
+        </div>
+        <div className="mt-3 space-y-2 overflow-y-auto max-h-[calc(100vh-300px)]">
+          {sessions.length === 0 && (
+            <div className="text-xs text-gray-500">No sessions yet.</div>
+          )}
+          {sessions.map((s) => (
+            <button
+              key={s.session_id}
+              onClick={() => setSessionId(s.session_id)}
+              className={`w-full text-left text-xs rounded px-2 py-2 border ${
+                s.session_id === sessionId ? 'border-primary-600 bg-white' : 'border-gray-200 bg-white'
+              }`}
+            >
+              <div className="font-medium truncate">{s.last_message}</div>
+              {s.last_updated && (
+                <div className="text-[10px] text-gray-500 mt-1">{s.last_updated}</div>
+              )}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 flex flex-col">
+        {/* Chat Header */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
+          <h2 className="text-lg font-semibold text-gray-900">Chat</h2>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={handleClear}
+              className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              title="Clear chat"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center text-gray-500">
             <p className="text-lg mb-2">Welcome! 👋</p>
@@ -164,36 +213,37 @@ export default function ChatInterface() {
             <span>Thinking...</span>
           </div>
         )}
-        <div ref={messagesEndRef} />
-      </div>
+          <div ref={messagesEndRef} />
+        </div>
 
-      {/* Disclaimer */}
-      <div className="px-4 py-2 bg-yellow-50 border-t border-yellow-200">
-        <p className="text-xs text-yellow-800">
-          ⚠️ This AI is not a licensed financial advisor. Please consult with qualified professionals for major financial decisions.
-        </p>
-      </div>
+        {/* Disclaimer */}
+        <div className="px-4 py-2 bg-yellow-50 border-t border-yellow-200">
+          <p className="text-xs text-yellow-800">
+            ⚠️ This AI is not a licensed financial advisor. Please consult with qualified professionals for major financial decisions.
+          </p>
+        </div>
 
-      {/* Input */}
-      <div className="p-4 border-t border-gray-200 bg-gray-50">
-        <div className="flex items-end space-x-2">
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Ask about SACCOs, investments, budgeting..."
-            className="flex-1 resize-none border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            rows={1}
-            style={{ minHeight: '48px', maxHeight: '120px' }}
-          />
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || isLoading}
-            className="p-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <Send className="w-5 h-5" />
-          </button>
+        {/* Input */}
+        <div className="p-4 border-t border-gray-200 bg-gray-50">
+          <div className="flex items-end space-x-2">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Ask about SACCOs, investments, budgeting..."
+              className="flex-1 resize-none border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              rows={1}
+              style={{ minHeight: '48px', maxHeight: '120px' }}
+            />
+            <button
+              onClick={handleSend}
+              disabled={!input.trim() || isLoading}
+              className="p-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <Send className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -37,8 +37,8 @@ def detect_language_style(text: str) -> LanguageStyle:
     en_hits = sum(1 for t in tokens if t in en_words and t not in neutral_terms)
 
     if sw_hits > 0 and en_hits > 0:
-        if min(sw_hits, en_hits) >= 2 or (en_hits >= 1 and sw_hits >= 2):
-            return "code-switch"
+        # Treat any clear mix as code-switch (even short prompts)
+        return "code-switch"
 
     if sw_hits > en_hits:
         return "kiswahili"
