@@ -68,7 +68,7 @@ class MemoryService:
         result = await db.execute(
             select(ChatHistory)
             .where(
-                (ChatHistory.user_id == user_id) | (ChatHistory.session_id == session_id)
+                (ChatHistory.user_id == user_id) & (ChatHistory.session_id == session_id)
             )
             .order_by(ChatHistory.created_at.desc())
             .limit(limit)
@@ -95,6 +95,14 @@ class MemoryService:
             .order_by(ChatSession.pinned.desc(), ChatSession.last_updated.desc())
         )
         sessions = result.scalars().all()
+        if not sessions:
+            await self._backfill_sessions_from_history(user_id, db)
+            result = await db.execute(
+                select(ChatSession)
+                .where(ChatSession.user_id == user_id, ChatSession.deleted_at.is_(None))
+                .order_by(ChatSession.pinned.desc(), ChatSession.last_updated.desc())
+            )
+            sessions = result.scalars().all()
         return [
             {
                 "session_id": s.session_id,
@@ -176,6 +184,30 @@ class MemoryService:
     def _summarize_title(self, message: str) -> str:
         trimmed = " ".join(message.strip().split())
         return trimmed[:60] + ("..." if len(trimmed) > 60 else "")
+
+    async def _backfill_sessions_from_history(self, user_id: str, db: AsyncSession) -> None:
+        result = await db.execute(
+            select(ChatHistory)
+            .where(ChatHistory.user_id == user_id)
+            .order_by(ChatHistory.created_at.desc())
+        )
+        entries = result.scalars().all()
+        seen = set()
+        for entry in entries:
+            if entry.session_id in seen:
+                continue
+            seen.add(entry.session_id)
+            session = ChatSession(
+                user_id=user_id,
+                session_id=entry.session_id,
+                title=self._summarize_title(entry.message),
+                summary=self._summarize_title(entry.message),
+                last_message=entry.message,
+                last_role=entry.role
+            )
+            db.add(session)
+        if seen:
+            await db.commit()
     
     async def clear_chat_history(
         self,
