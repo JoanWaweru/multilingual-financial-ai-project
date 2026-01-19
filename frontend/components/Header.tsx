@@ -1,6 +1,7 @@
 'use client'
 
 import { Wallet, Globe } from 'lucide-react'
+import AuthControls from './AuthControls'
 
 export default function Header() {
   return (
@@ -18,9 +19,12 @@ export default function Header() {
               </p>
             </div>
           </div>
-          <div className="flex items-center space-x-2 text-sm text-gray-600">
-            <Globe className="w-4 h-4" />
-            <span>English / Kiswahili</span>
+          <div className="flex flex-col items-end space-y-2">
+            <div className="flex items-center space-x-2 text-sm text-gray-600">
+              <Globe className="w-4 h-4" />
+              <span>English / Kiswahili</span>
+            </div>
+            <AuthControls />
           </div>
         </div>
       </div>

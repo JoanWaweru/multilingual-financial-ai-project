@@ -9,6 +9,7 @@ from app.core.database import get_db
 from app.services.rag_service import rag_service
 from app.services.memory_service import memory_service
 from app.core.config import settings
+from app.services.auth_service import get_current_user_optional
 
 router = APIRouter()
 
@@ -29,12 +30,16 @@ class ChatResponse(BaseModel):
 @router.post("/", response_model=ChatResponse)
 async def chat(
     request: ChatRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user_optional)
 ):
     """Main chat endpoint with RAG"""
     try:
         # Get or create user
-        user = await memory_service.get_or_create_user(request.session_id, db)
+        if current_user:
+            user = current_user
+        else:
+            user = await memory_service.get_or_create_user(request.session_id, db)
         
         # Get chat history
         chat_history = await memory_service.get_chat_history(

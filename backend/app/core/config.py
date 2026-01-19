@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     language_style_retry_enabled: bool = True
     language_style_retry_max: int = 1
 
+    # Authentication
+    auth_secret_key: str = "change-me"
+    auth_algorithm: str = "HS256"
+    auth_access_token_minutes: int = 60 * 24 * 7
+
     # Live Market Data (optional)
     nse_market_data_url: Optional[str] = None
     nse_market_category: Optional[str] = None

@@ -7,6 +7,7 @@ from typing import Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.services.memory_service import memory_service
+from app.services.auth_service import get_current_user_optional
 
 router = APIRouter()
 
@@ -22,11 +23,15 @@ class ClearRequest(BaseModel):
 @router.post("/preferences")
 async def save_preference(
     request: PreferenceRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user_optional)
 ):
     """Save user preference"""
     try:
-        user = await memory_service.get_or_create_user(request.session_id, db)
+        if current_user:
+            user = current_user
+        else:
+            user = await memory_service.get_or_create_user(request.session_id, db)
         await memory_service.save_user_preference(
             user.id,
             request.key,
@@ -40,11 +45,15 @@ async def save_preference(
 @router.get("/preferences/{session_id}")
 async def get_preferences(
     session_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user_optional)
 ):
     """Get all user preferences"""
     try:
-        user = await memory_service.get_or_create_user(session_id, db)
+        if current_user:
+            user = current_user
+        else:
+            user = await memory_service.get_or_create_user(session_id, db)
         preferences = await memory_service.get_user_preferences(user.id, db=db)
         return {"preferences": preferences}
     except Exception as e:
@@ -53,11 +62,15 @@ async def get_preferences(
 @router.post("/clear")
 async def clear_memory(
     request: ClearRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user_optional)
 ):
     """Clear chat history and/or preferences"""
     try:
-        user = await memory_service.get_or_create_user(request.session_id, db)
+        if current_user:
+            user = current_user
+        else:
+            user = await memory_service.get_or_create_user(request.session_id, db)
         
         if request.clear_type == "chat" or request.clear_type == "all":
             await memory_service.clear_chat_history(user.id, request.session_id, db=db)

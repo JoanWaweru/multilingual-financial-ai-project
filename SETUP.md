@@ -38,6 +38,9 @@
    # Optional: retry once if the response violates language style
    LANGUAGE_STYLE_RETRY_ENABLED=true
    LANGUAGE_STYLE_RETRY_MAX=1
+   
+   # Authentication (required for login)
+   AUTH_SECRET_KEY=change-me
    ```
    
    Create `frontend/.env.local`:

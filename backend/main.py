@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
-from app.api import chat, memory, documents
+from app.api import chat, memory, documents, auth
 from app.core.config import settings
 from app.core.database import init_db
 
@@ -28,6 +28,7 @@ app.add_middleware(
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(memory.router, prefix="/api/memory", tags=["memory"])
 app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 
 @app.on_event("startup")
 async def startup_event():

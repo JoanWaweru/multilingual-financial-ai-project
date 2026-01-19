@@ -9,6 +9,17 @@ const api = axios.create({
   },
 })
 
+api.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('auth_token')
+    if (token) {
+      config.headers = config.headers || {}
+      config.headers.Authorization = `Bearer ${token}`
+    }
+  }
+  return config
+})
+
 export interface ChatResponse {
   response: string
   confidence: number
@@ -54,3 +65,32 @@ export async function getPreferences(sessionId: string) {
   return response.data
 }
 
+export interface AuthResponse {
+  access_token: string
+  token_type: string
+  user_id: string
+  email: string
+  full_name?: string
+}
+
+export async function registerUser(email: string, password: string, fullName?: string) {
+  const response = await api.post<AuthResponse>('/api/auth/register', {
+    email,
+    password,
+    full_name: fullName,
+  })
+  return response.data
+}
+
+export async function loginUser(email: string, password: string) {
+  const response = await api.post<AuthResponse>('/api/auth/login', {
+    email,
+    password,
+  })
+  return response.data
+}
+
+export async function getMe() {
+  const response = await api.get('/api/auth/me')
+  return response.data
+}
