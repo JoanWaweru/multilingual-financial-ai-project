@@ -62,7 +62,7 @@ Create `.env` files in both `backend/` and `frontend/` directories:
 ANTHROPIC_API_KEY=your_anthropic_api_key
 DATABASE_URL=sqlite:///./financial_advisor.db
 EMBEDDING_MODEL=text-embedding-3-small
-LLM_MODEL=claude-3-5-sonnet-20240620
+LLM_MODEL=claude-sonnet-4-6
 ```
 
 **frontend/.env.local**:
