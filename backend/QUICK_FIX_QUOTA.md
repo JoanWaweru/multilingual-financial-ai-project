@@ -1,6 +1,6 @@
-# Quick Fix for OpenAI Quota Error
+# Quick Fix for Claude Quota Error
 
-You're getting a quota error because your OpenAI API key has exceeded its usage limit.
+You're getting a quota error because your Claude API key has exceeded its usage limit.
 
 ## Immediate Solution: Use Local Embeddings
 
@@ -14,11 +14,11 @@ Edit `backend/.env` and add:
 USE_LOCAL_EMBEDDINGS=true
 ```
 
-Or if you want to temporarily disable OpenAI key requirement:
+Or if you want to temporarily disable Claude key requirement:
 
 ```env
-# Comment out or remove OPENAI_API_KEY to force local mode
-# OPENAI_API_KEY=your_key_here
+# Comment out or remove ANTHROPIC_API_KEY to force local mode
+# ANTHROPIC_API_KEY=your_key_here
 USE_LOCAL_EMBEDDINGS=true
 ```
 
@@ -30,7 +30,7 @@ source venv/bin/activate
 python scripts/ingest_documents.py
 ```
 
-The system will now use sentence-transformers (local, free) instead of OpenAI.
+The system will now use sentence-transformers (local, free) instead of Claude.
 
 ## What Happens
 
@@ -38,11 +38,11 @@ The system will now use sentence-transformers (local, free) instead of OpenAI.
 - **After that**: All embeddings are generated locally, no API calls
 - **RAG system**: Still works perfectly with local embeddings
 
-## Alternative: Fix OpenAI Quota
+## Alternative: Fix Claude Quota
 
-If you want to use OpenAI embeddings:
+If you want to use Claude embeddings:
 
-1. Add credits to your OpenAI account: https://platform.openai.com/account/billing
+1. Add credits to your Claude account: https://console.anthropic.com/settings/billing
 2. Or wait for quota to reset (usually monthly)
 3. Remove `USE_LOCAL_EMBEDDINGS=true` from `.env`
 

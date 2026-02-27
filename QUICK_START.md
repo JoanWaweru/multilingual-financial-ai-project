@@ -26,15 +26,15 @@ pip install -r requirements.txt
 # Create necessary directories
 mkdir -p data/vector_store database
 
-# Create .env file (you'll need to add your OpenAI API key)
+# Create .env file (you'll need to add your Claude API key)
 cat > .env << EOF
-OPENAI_API_KEY=your_openai_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
 DATABASE_URL=sqlite:///./database/financial_advisor.db
 EMBEDDING_MODEL=text-embedding-3-small
 LLM_MODEL=gpt-4-turbo-preview
 EOF
 
-# Edit .env and add your actual OpenAI API key
+# Edit .env and add your actual Claude API key
 # You can use: nano .env  or  open -e .env
 ```
 
@@ -104,7 +104,7 @@ You should see:
 
 ### Backend won't start
 - Make sure virtual environment is activated (`source venv/bin/activate`)
-- Check that `.env` file exists and has your OpenAI API key
+- Check that `.env` file exists and has your Claude API key
 - Ensure port 8000 is not in use: `lsof -i :8000`
 
 ### Frontend won't start
@@ -116,10 +116,10 @@ You should see:
 - Backend: Make sure venv is activated and you ran `pip install -r requirements.txt`
 - Frontend: Make sure you ran `npm install`
 
-### OpenAI API errors
+### Claude API errors
 - Verify your API key is correct in `backend/.env`
-- Check you have credits in your OpenAI account
-- Try a simple test: `curl https://api.openai.com/v1/models -H "Authorization: Bearer YOUR_KEY"`
+- Check you have credits in your Claude account
+- Try a simple test: `curl https://api.anthropic.com/v1/messages -H "x-api-key: YOUR_KEY"`
 
 ## Quick Test
 

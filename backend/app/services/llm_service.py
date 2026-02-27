@@ -1,8 +1,8 @@
 """
-LLM service for generating responses using OpenAI or Anthropic
+LLM service for generating responses using Anthropic
 """
-from openai import OpenAI, RateLimitError, APIError
-from typing import List, Dict, Optional
+import anthropic
+from typing import List, Dict, Optional, Tuple
 from app.core.config import settings
 from app.utils.language_detection import detect_language_style, language_style_instruction, is_code_switch_compliant
 import json
@@ -11,7 +11,7 @@ class LLMService:
     """Service for LLM interactions"""
     
     def __init__(self):
-        self.client = OpenAI(api_key=settings.openai_api_key)
+        self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
         self.model = settings.llm_model
         self.temperature = settings.temperature
         self.max_tokens = settings.max_tokens
@@ -40,6 +40,8 @@ RESPONSE GUIDELINES:
 - Be clear, empathetic, and culturally aware
 - Use simple language, avoiding unnecessary jargon
 - Provide reasoning for your recommendations
+- Answer only the current user query. Do not introduce unrelated topics.
+- Do not invent facts, figures, or rates. If a detail is not in the provided context, say you do not have verified information.
 - If live market data is provided, use it carefully and mention that prices can change
 - If the live data indicates indices or summary stats only, explain that individual share movers are not available from this source
 - When live share movers are unavailable, give a short fallback and point to official sources
@@ -84,6 +86,17 @@ RESPONSE GUIDELINES:
                 "role": "system",
                 "content": f"Relevant financial information:\n{context_text}\n\nUse this information to provide accurate, context-aware responses."
             })
+            if settings.require_citations:
+                sources_list = self._extract_sources(context)
+                if sources_list:
+                    messages.append({
+                        "role": "system",
+                        "content": (
+                            "Answer only using the provided sources. "
+                            f"End your response with a final line: {self._citation_label(expected_style or 'english')} "
+                            + "; ".join(sources_list)
+                        )
+                    })
             if "Live NSE market snapshot" in context_text:
                 messages.append({
                     "role": "system",
@@ -139,14 +152,13 @@ RESPONSE GUIDELINES:
             if settings.enable_language_style_constraint and settings.eval_temperature_override is not None:
                 temperature = settings.eval_temperature_override
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=self.max_tokens
+            system_text, non_system_messages = self._to_anthropic_messages(messages)
+            response, content = self._anthropic_request(
+                system_text,
+                non_system_messages,
+                temperature,
+                self.max_tokens
             )
-            
-            content = response.choices[0].message.content
             retry_count = 0
             if (
                 settings.enable_language_style_constraint
@@ -178,59 +190,40 @@ RESPONSE GUIDELINES:
                     })
                     retry_messages.append({"role": "user", "content": "Rewrite the response now."})
 
-                    retry_response = self.client.chat.completions.create(
-                        model=self.model,
-                        messages=retry_messages,
-                        temperature=temperature,
-                        max_tokens=self.max_tokens
+                    retry_system, retry_non_system = self._to_anthropic_messages(retry_messages)
+                    retry_response, content = self._anthropic_request(
+                        retry_system,
+                        retry_non_system,
+                        temperature,
+                        self.max_tokens
                     )
-                    content = retry_response.choices[0].message.content
 
             
             # Calculate confidence (simple heuristic based on response length and structure)
             confidence = self._calculate_confidence(content, context)
+
+            if settings.require_citations and context:
+                sources_list = self._extract_sources(context)
+                label = self._citation_label(expected_style or "english")
+                has_label = label.lower() in content.lower()
+                has_source = any(source.lower() in content.lower() for source in sources_list)
+                if sources_list and not (has_label and has_source):
+                    content = self._no_verified_info_message(user_message)
+                else:
+                    context_text = self._format_context(context)
+                    if self._has_unsupported_numbers(content, context_text):
+                        content = self._no_verified_info_message(user_message)
+
+            if expected_style == "code-switch" and not is_code_switch_compliant(content):
+                content = self._no_verified_info_message(user_message)
             
             return {
                 "response": content,
                 "confidence": confidence,
                 "model": self.model,
-                "tokens_used": response.usage.total_tokens if hasattr(response, 'usage') else None
+                "tokens_used": response.usage.output_tokens if hasattr(response, 'usage') else None
             }
         
-        except (RateLimitError, APIError) as e:
-            # Quota exceeded, rate limit, or other API errors
-            error_msg = str(e)
-            error_code = getattr(e, 'code', None) or getattr(e, 'status_code', None) or ""
-            error_code_str = str(error_code).lower()
-            
-            # Check if it's a quota error (429 with insufficient_quota)
-            if ("quota" in error_msg.lower() or "insufficient_quota" in error_msg.lower() or 
-                "insufficient_quota" in error_code_str or error_code == 429):
-                response_msg = """I apologize, but I'm currently unable to process requests due to OpenAI API quota limitations. 
-
-**To resolve this issue:**
-1. Check your OpenAI account billing and credits at https://platform.openai.com/account/billing
-2. Add credits to your OpenAI account
-3. Or wait until your quota resets
-
-**Note:** This system uses OpenAI's API for generating responses. Without sufficient quota, the AI cannot generate answers, even though the knowledge base is available.
-
-If you continue to see this error, please contact your system administrator."""
-                error_type = "quota_exceeded"
-            elif "rate" in error_msg.lower() or "rate_limit" in error_code_str:
-                response_msg = f"I'm currently experiencing rate limiting. Please try again in a moment. (Rate limit error: {str(e)})"
-                error_type = "rate_limit"
-            else:
-                # Other API errors
-                response_msg = f"I apologize, but I encountered an API error. Please check your OpenAI API key and account status. Error: {str(e)}"
-                error_type = "api_error"
-            
-            return {
-                "response": response_msg,
-                "confidence": 0.1,
-                "model": self.model,
-                "error": error_type
-            }
         except Exception as e:
             return {
                 "response": f"I apologize, but I encountered an error. Please try again. (Error code: {type(e).__name__} - {str(e)})",
@@ -277,22 +270,49 @@ If you continue to see this error, please contact your system administrator."""
             )
         return "User risk tolerance is set; align advice accordingly."
 
+    def _citation_label(self, style: str) -> str:
+        if style == "kiswahili":
+            return "Vyanzo:"
+        if style == "code-switch":
+            return "Sources/Vyanzo:"
+        return "Sources:"
+
+    def _extract_sources(self, context: List[Dict]) -> List[str]:
+        sources = []
+        for item in context:
+            source = item.get("metadata", {}).get("source")
+            if source and source not in sources:
+                sources.append(source)
+        return sources
+
+    def _no_verified_info_message(self, user_message: str) -> str:
+        style = detect_language_style(user_message)
+        if style == "kiswahili":
+            return (
+                "Samahani, sina taarifa zilizothibitishwa za kujibu swali hilo kwa sasa. "
+                "Tafadhali toa chanzo au uliza kuhusu jambo lililo kwenye nyaraka zilizopo."
+            )
+        if style == "code-switch":
+            return (
+                "I don't have verified information to answer that right now. "
+                "Tafadhali toa chanzo au uliza kuhusu jambo lililo kwenye nyaraka zilizopo."
+            )
+        return (
+            "I don't have verified information to answer that right now. "
+            "Please provide a source or ask about something covered in the available documents."
+        )
+
     async def summarize_session_title(self, message: str) -> str:
         """Generate a short session title (4-6 words)."""
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "Summarize the message into a 4-6 word title. No punctuation."
-                    },
-                    {"role": "user", "content": message.strip()}
-                ],
+            system_text = "Summarize the message into a 4-6 word title. No punctuation."
+            _, title = self._anthropic_request(
+                system_text,
+                [{"role": "user", "content": message.strip()}],
                 temperature=0.2,
                 max_tokens=20
             )
-            title = response.choices[0].message.content.strip()
+            title = title.strip()
             return " ".join(title.split())[:60]
         except Exception:
             trimmed = " ".join(message.strip().split())
@@ -315,6 +335,71 @@ If you continue to see this error, please contact your system administrator."""
             base_confidence *= 0.9
         
         return min(1.0, max(0.3, base_confidence))
+
+    def _has_unsupported_numbers(self, response: str, context_text: str) -> bool:
+        import re
+        numbers = re.findall(r"\b\d+(?:\.\d+)?\b", response)
+        if not numbers:
+            return False
+        context_lower = context_text.lower()
+        for number in numbers:
+            if number.lower() not in context_lower:
+                return True
+        return False
+
+    def _to_anthropic_messages(self, messages: List[Dict]) -> Tuple[str, List[Dict]]:
+        system_parts = [m["content"] for m in messages if m.get("role") == "system"]
+        system_text = "\n\n".join(system_parts)
+        non_system = []
+        for m in messages:
+            role = m.get("role")
+            if role == "system":
+                continue
+            if role not in ("user", "assistant"):
+                role = "user"
+            non_system.append({"role": role, "content": m.get("content", "")})
+        return system_text, non_system
+
+    def _anthropic_request(
+        self,
+        system_text: str,
+        messages: List[Dict],
+        temperature: float,
+        max_tokens: int
+    ) -> Tuple[object, str]:
+        # New SDK path
+        if hasattr(self.client, "messages"):
+            response = self.client.messages.create(
+                model=self.model,
+                system=system_text,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+            content = response.content[0].text if response.content else ""
+            return response, content
+
+        # Fallback for older SDKs
+        human_prompt = getattr(anthropic, "HUMAN_PROMPT", "\n\nHuman:")
+        ai_prompt = getattr(anthropic, "AI_PROMPT", "\n\nAssistant:")
+        prompt_parts = [f"{human_prompt} {system_text}"]
+        for m in messages:
+            role = m.get("role")
+            text = m.get("content", "")
+            if role == "assistant":
+                prompt_parts.append(f"{ai_prompt} {text}")
+            else:
+                prompt_parts.append(f"{human_prompt} {text}")
+        prompt_parts.append(ai_prompt)
+        prompt = "".join(prompt_parts)
+        response = self.client.completions.create(
+            model=self.model,
+            prompt=prompt,
+            temperature=temperature,
+            max_tokens_to_sample=max_tokens
+        )
+        content = getattr(response, "completion", "")
+        return response, content
 
 llm_service = LLMService()
 

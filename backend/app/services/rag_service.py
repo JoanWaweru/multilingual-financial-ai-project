@@ -6,6 +6,7 @@ from app.services.vector_store import vector_store
 from app.services.llm_service import llm_service
 from app.services.market_data_service import market_data_service
 from app.core.config import settings
+from app.utils.language_detection import detect_language_style
 
 class RAGService:
     """Service for RAG pipeline"""
@@ -60,6 +61,15 @@ class RAGService:
                         'similarity_score': 0.9
                     })
         
+        if settings.require_citations and not context:
+            return {
+                "response": self._no_verified_info_message(query),
+                "confidence": 0.2,
+                "retrieved_documents": 0,
+                "sources": [],
+                "evidence": []
+            }
+
         # Step 2: Generate response using LLM with context
         response = await llm_service.generate_response(
             user_message=query,
@@ -87,6 +97,23 @@ class RAGService:
         ]
         
         return response
+
+    def _no_verified_info_message(self, query: str) -> str:
+        style = detect_language_style(query)
+        if style == "kiswahili":
+            return (
+                "Samahani, sina taarifa zilizothibitishwa za kujibu swali hilo kwa sasa. "
+                "Tafadhali toa chanzo au uliza kuhusu jambo lililo kwenye nyaraka zilizopo."
+            )
+        if style == "code-switch":
+            return (
+                "I don't have verified information to answer that right now. "
+                "Tafadhali toa chanzo au uliza kuhusu jambo lililo kwenye nyaraka zilizopo."
+            )
+        return (
+            "I don't have verified information to answer that right now. "
+            "Please provide a source or ask about something covered in the available documents."
+        )
 
 
     def _is_market_query(self, query: str) -> bool:

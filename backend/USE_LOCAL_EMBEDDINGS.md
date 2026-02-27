@@ -1,6 +1,6 @@
-# Using Local Embeddings (No OpenAI API Required)
+# Using Local Embeddings (No Claude API Required)
 
-If you've exceeded your OpenAI API quota or want to test without API costs, you can use local embeddings instead.
+If you've exceeded your Claude API quota or want to test without API costs, you can use local embeddings instead.
 
 ## Option 1: Set Environment Variable
 
@@ -10,13 +10,13 @@ Add this to your `backend/.env` file:
 USE_LOCAL_EMBEDDINGS=true
 ```
 
-Then run the ingestion script again. It will automatically use sentence-transformers (free, local) instead of OpenAI.
+Then run the ingestion script again. It will automatically use sentence-transformers (free, local) instead of Claude.
 
 ## Option 2: Force Local Mode in Code
 
 The embedding service will automatically fall back to local embeddings if:
-- OpenAI API quota is exceeded
-- OpenAI API key is invalid
+- Claude API quota is exceeded
+- Claude API key is invalid
 - `USE_LOCAL_EMBEDDINGS=true` is set
 
 ## What Changes
@@ -25,7 +25,7 @@ The embedding service will automatically fall back to local embeddings if:
 - **Pros**: Free, no API calls, works offline
 - **Cons**: Different dimensions (384 vs 1536), may have slightly different results
 
-**OpenAI Model**: `text-embedding-3-small` (1536 dimensions)
+**Claude Model**: `text-embedding-3-small` (1536 dimensions)
 - **Pros**: Higher quality, consistent dimensions
 - **Cons**: Requires API key and credits
 
@@ -41,12 +41,12 @@ For academic purposes and testing, local embeddings are perfectly fine. The RAG 
 
 ## Switching Back
 
-To use OpenAI embeddings again:
+To use Claude embeddings again:
 1. Remove or set `USE_LOCAL_EMBEDDINGS=false` in `.env`
-2. Ensure your OpenAI API key is valid and has credits
+2. Ensure your Claude API key is valid and has credits
 3. Restart the application
 
 ## Current Status
 
-The system will automatically detect OpenAI quota issues and switch to local embeddings, so you can continue testing even with API limitations.
+The system will automatically detect Claude quota issues and switch to local embeddings, so you can continue testing even with API limitations.
 

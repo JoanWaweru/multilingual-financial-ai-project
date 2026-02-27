@@ -15,9 +15,9 @@ A web-based conversational AI system designed to assist Kenyans with personal fi
 - **Frontend**: Next.js 14 (React)
 - **Backend**: Python FastAPI
 - **Vector DB**: FAISS
-- **LLM**: OpenAI GPT-4 / Anthropic Claude
+- **LLM**: Anthropic Claude
 - **Database**: SQLite (can be upgraded to PostgreSQL)
-- **Embeddings**: OpenAI text-embedding-3-small
+- **Embeddings**: Claude text-embedding-3-small
 
 ## Quick Start
 
@@ -59,11 +59,10 @@ Create `.env` files in both `backend/` and `frontend/` directories:
 
 **backend/.env**:
 ```
-OPENAI_API_KEY=your_openai_api_key
-ANTHROPIC_API_KEY=your_anthropic_api_key (optional)
+ANTHROPIC_API_KEY=your_anthropic_api_key
 DATABASE_URL=sqlite:///./financial_advisor.db
 EMBEDDING_MODEL=text-embedding-3-small
-LLM_MODEL=gpt-4-turbo-preview
+LLM_MODEL=claude-3-5-sonnet-20240620
 ```
 
 **frontend/.env.local**:

@@ -7,8 +7,8 @@ A fully functional conversational AI financial advisor system for Kenyans has be
 ### Backend (FastAPI)
 
 1. **Core Services**
-   - ✅ LLM Service: OpenAI GPT-4 integration with system prompts and disclaimers
-   - ✅ Embedding Service: OpenAI text-embedding-3-small for vector embeddings
+  - ✅ LLM Service: Claude integration with system prompts and disclaimers
+  - ✅ Embedding Service: Claude text-embedding-3-small for vector embeddings
    - ✅ Vector Store: FAISS-based document retrieval system
    - ✅ RAG Service: Complete Retrieval-Augmented Generation pipeline
    - ✅ Memory Service: Short-term (chat history) and long-term (user preferences) memory
@@ -67,8 +67,8 @@ A fully functional conversational AI financial advisor system for Kenyans has be
 
 ### AI & Data Science
 - ✅ **RAG Pipeline**: Complete retrieval-augmented generation with FAISS vector store
-- ✅ **LLM Integration**: OpenAI GPT-4 with custom system prompts
-- ✅ **Vector Embeddings**: 1536-dimensional embeddings using OpenAI
+- ✅ **LLM Integration**: Claude with custom system prompts
+- ✅ **Vector Embeddings**: 1536-dimensional embeddings using Claude
 - ✅ **Memory Architecture**: 
   - Short-term: Chat history (last 20 messages)
   - Long-term: User preferences (risk level, language, goals)
@@ -129,7 +129,7 @@ kenyan-financial-ai/
 ```bash
 # 1. Set up environment variables
 cp backend/.env.example backend/.env
-# Edit backend/.env with your OpenAI API key
+# Edit backend/.env with your Claude API key
 
 # 2. Start services
 docker-compose up --build
@@ -158,8 +158,8 @@ Try these sample questions:
 
 - **Backend**: Python 3.11, FastAPI, SQLAlchemy (async), FAISS
 - **Frontend**: Next.js 14, React 18, TypeScript, Tailwind CSS
-- **LLM**: OpenAI GPT-4 Turbo
-- **Embeddings**: OpenAI text-embedding-3-small (1536 dims)
+- **LLM**: Claude 3.5 Sonnet
+- **Embeddings**: Claude text-embedding-3-small (1536 dims)
 - **Vector DB**: FAISS (IndexFlatL2)
 - **Database**: SQLite (upgradeable to PostgreSQL)
 - **Chunking**: 1000 chars with 200 char overlap

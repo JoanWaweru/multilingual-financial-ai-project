@@ -5,7 +5,7 @@
 - Python 3.9 or higher
 - Node.js 18 or higher
 - Docker and Docker Compose (optional, for containerized deployment)
-- OpenAI API key
+- Anthropic API key
 
 ## Quick Start with Docker
 
@@ -18,10 +18,10 @@
    
    Create `backend/.env`:
    ```env
-   OPENAI_API_KEY=your_openai_api_key_here
+   ANTHROPIC_API_KEY=your_anthropic_api_key_here
    DATABASE_URL=sqlite:///./database/financial_advisor.db
    EMBEDDING_MODEL=text-embedding-3-small
-   LLM_MODEL=gpt-4-turbo-preview
+   LLM_MODEL=claude-sonnet-4-6
    
    # Optional: live NSE market data source (JSON or CSV)
    NSE_MARKET_DATA_URL=https://your-data-source.example/nse-market-data
@@ -86,7 +86,7 @@
 4. **Set up environment variables**
    ```bash
    cp .env.example .env
-   # Edit .env with your OpenAI API key
+   # Edit .env with your Anthropic API key
    ```
 
 5. **Create necessary directories**
@@ -153,7 +153,7 @@
 
 ## Code-Switching Evaluation
 
-Generate evaluation responses (requires `OPENAI_API_KEY`):
+Generate evaluation responses (requires `ANTHROPIC_API_KEY`):
 
 ```bash
 cd backend
@@ -194,7 +194,7 @@ python scripts/evaluate_code_switching.py
 
 - **Import errors**: Make sure virtual environment is activated
 - **Database errors**: Check that database directory exists and is writable
-- **OpenAI API errors**: Verify API key is correct and has credits
+- **Anthropic API errors**: Verify API key is correct and has credits
 - **Vector store errors**: Run document ingestion script first
 
 ### Frontend Issues

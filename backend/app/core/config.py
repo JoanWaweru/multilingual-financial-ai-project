@@ -8,7 +8,6 @@ class Settings(BaseSettings):
     """Application settings"""
     
     # API Keys
-    openai_api_key: Optional[str] = None
     anthropic_api_key: Optional[str] = None
     
     # Database
@@ -16,7 +15,7 @@ class Settings(BaseSettings):
     
     # LLM Settings
     embedding_model: str = "text-embedding-3-small"
-    llm_model: str = "gpt-4o-mini"  # Changed from gpt-4-turbo-preview to gpt-4o-mini (more widely available)
+    llm_model: str = "claude-sonnet-4-6"
     max_tokens: int = 2000
     temperature: float = 0.7
     
@@ -33,11 +32,11 @@ class Settings(BaseSettings):
     # Safety & Ethics
     disclaimer_enabled: bool = True
     confidence_threshold: float = 0.6
-    require_citations: bool = False
-    min_context_similarity: float = 0.0
+    require_citations: bool = True
+    min_context_similarity: float = 0.2
     
-    # Local Embeddings (fallback when OpenAI quota is exceeded)
-    use_local_embeddings: bool = False
+    # Local Embeddings (default for this project)
+    use_local_embeddings: bool = True
 
     # Code-switching constraints
     enable_language_style_constraint: bool = True
