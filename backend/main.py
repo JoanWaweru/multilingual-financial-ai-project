@@ -45,6 +45,32 @@ async def startup_event():
     """Initialize database and vector store on startup"""
     await init_db()
     print("✅ Database initialized")
+
+    # If vector store is empty (e.g. Render Native Python, first deploy), run ingestion
+    from app.services.vector_store import vector_store
+    stats = vector_store.get_stats()
+    if stats.get("total_documents", 0) == 0 and stats.get("index_size", 0) == 0:
+        import asyncio
+        import subprocess
+        import sys
+        from pathlib import Path
+        backend_dir = Path(__file__).resolve().parent
+        print("⚠️ Vector store empty; running document ingestion...")
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: subprocess.run(
+                [sys.executable, "-m", "scripts.ingest_documents"],
+                cwd=str(backend_dir),
+                timeout=300,
+                capture_output=True,
+                text=True,
+            )
+        )
+        vector_store.reload_from_disk()
+        stats = vector_store.get_stats()
+        print(f"✅ Ingested {stats.get('total_documents', 0)} document chunks")
+
     print("✅ Application ready")
 
 @app.get("/")
@@ -57,7 +83,13 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    from app.services.vector_store import vector_store
+    stats = vector_store.get_stats()
+    return {
+        "status": "healthy",
+        "vector_store_documents": stats.get("total_documents", 0),
+        "vector_store_index_size": stats.get("index_size", 0),
+    }
 
 if __name__ == "__main__":
     uvicorn.run(

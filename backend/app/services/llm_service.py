@@ -214,8 +214,10 @@ RESPONSE GUIDELINES:
                     if self._has_unsupported_numbers(content, context_text):
                         content = self._no_verified_info_message(user_message)
 
+            # If code-switch was requested but the response isn't compliant, keep the
+            # response (it may still be correct); don't replace with "no verified info"
             if expected_style == "code-switch" and not is_code_switch_compliant(content):
-                content = self._no_verified_info_message(user_message)
+                confidence = min(confidence, 0.7)  # Slightly lower confidence for style mismatch
             
             return {
                 "response": content,
@@ -383,6 +385,16 @@ RESPONSE GUIDELINES:
             return False
         context_lower = context_text.lower()
         for number in numbers:
+            # Skip single digits 1-9 (often list indices or "one of the N")
+            if number in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
+                continue
+            # Skip common years (likely from context or general knowledge)
+            try:
+                y = int(number.split(".")[0])
+                if 1990 <= y <= 2030:
+                    continue
+            except ValueError:
+                pass
             if number.lower() not in context_lower:
                 return True
         return False

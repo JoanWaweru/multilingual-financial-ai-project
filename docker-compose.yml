@@ -8,11 +8,10 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - DATABASE_URL=sqlite:///./financial_advisor.db
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - DATABASE_URL=sqlite:///./database/financial_advisor.db
       - EMBEDDING_MODEL=text-embedding-3-small
-      - LLM_MODEL=gpt-4-turbo-preview
+      - LLM_MODEL=claude-sonnet-4-6
     volumes:
       - ./backend/data:/app/data
       - ./backend/database:/app/database

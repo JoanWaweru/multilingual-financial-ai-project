@@ -29,12 +29,24 @@ class VectorStore:
                 self.index = faiss.read_index(self.index_path)
                 with open(self.metadata_path, 'rb') as f:
                     self.documents = pickle.load(f)
-                print(f"✅ Loaded vector store with {len(self.documents)} documents")
+                # Ensure index dimension matches current embedding model (e.g. after switching local vs API)
+                if self.index.d != self.dimension:
+                    print(
+                        f"⚠️ Index dimension ({self.index.d}) does not match embedding dimension ({self.dimension}). "
+                        "Creating new index. Re-run document ingestion to populate."
+                    )
+                    self._create_new_index()
+                else:
+                    print(f"✅ Loaded vector store with {len(self.documents)} documents")
             except Exception as e:
                 print(f"⚠️ Error loading index: {e}. Creating new index.")
                 self._create_new_index()
         else:
             self._create_new_index()
+
+    def reload_from_disk(self):
+        """Reload index and metadata from disk (e.g. after another process ran ingestion)."""
+        self._load_or_create_index()
     
     def _create_new_index(self):
         """Create a new FAISS index"""

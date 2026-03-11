@@ -153,7 +153,10 @@ class RAGService:
         return any(k in q for k in keywords)
 
     def _is_smalltalk_query(self, query: str) -> bool:
+        import re
         q = query.strip().lower()
+        if not q:
+            return False
         keywords = [
             "hi", "hello", "hey", "hey there", "hi there", "yo",
             "habari", "mambo", "niaje", "sasa", "vipi", "poa", "salama",
@@ -163,7 +166,13 @@ class RAGService:
             "thanks", "thank you", "thx", "ty", "asante", "shukran", "nashukuru",
             "welcome", "karibu"
         ]
-        return any(k == q or k in q for k in keywords)
+        # If it's a short greeting-only message, allow phrase match
+        if len(q.split()) <= 4 and any(k == q or k in q for k in keywords):
+            return True
+        # Otherwise only match whole-word greetings to avoid false positives (e.g., "which")
+        tokens = set(re.findall(r"[a-z']+", q))
+        single_words = {k for k in keywords if " " not in k}
+        return any(word in tokens for word in single_words)
 
     def _smalltalk_response(self, query: str) -> str:
         style = detect_language_style(query)

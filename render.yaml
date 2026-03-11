@@ -1,0 +1,19 @@
+# Render Blueprint: deploy backend from this repo
+# Docs: https://render.com/docs/blueprint-spec
+#
+# In Render Dashboard: New > Blueprint > connect repo; Render will use this file.
+# Set ANTHROPIC_API_KEY in the Render service Environment.
+
+services:
+  - type: web
+    name: kenyan-financial-ai-backend
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        value: sqlite:///./database/financial_advisor.db
+      - key: USE_LOCAL_EMBEDDINGS
+        value: "true"
