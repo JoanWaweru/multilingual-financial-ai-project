@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     auth_algorithm: str = "HS256"
     auth_access_token_minutes: int = 60 * 24 * 7
     password_reset_token_ttl_minutes: int = 30
+    admin_bootstrap_key: str = ""
 
     # CORS
     cors_allow_origins: str = ""

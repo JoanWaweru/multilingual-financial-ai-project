@@ -1,17 +1,24 @@
 """
 Admin API endpoints for analytics and feedback
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.user import User
 from app.models.chat_history import ChatHistory
 from app.models.feedback import Feedback
-from app.services.auth_service import require_roles
+from app.services.auth_service import require_roles, get_user_by_email
 
 router = APIRouter()
+
+
+class AdminBootstrapRequest(BaseModel):
+    email: EmailStr
+    key: str
 
 
 @router.get("/overview")
@@ -92,3 +99,20 @@ async def list_feedback(
             for f in items
         ]
     }
+
+
+@router.post("/bootstrap")
+async def bootstrap_admin(
+    request: AdminBootstrapRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    if not settings.admin_bootstrap_key:
+        raise HTTPException(status_code=400, detail="Admin bootstrap key not configured")
+    if request.key != settings.admin_bootstrap_key:
+        raise HTTPException(status_code=403, detail="Invalid bootstrap key")
+    user = await get_user_by_email(db, request.email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.role = "admin"
+    await db.commit()
+    return {"status": "success", "email": user.email, "role": user.role}

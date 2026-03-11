@@ -24,4 +24,5 @@ bcrypt==3.2.2
 fpdf2==2.7.8
 setuptools>=68.0.0
 wheel
+asyncpg==0.29.0
 
