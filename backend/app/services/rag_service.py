@@ -82,6 +82,14 @@ class RAGService:
                 })
         
         if settings.require_citations and not context:
+            if self._is_smalltalk_query(query):
+                return {
+                    "response": self._smalltalk_response(query),
+                    "confidence": 0.6,
+                    "retrieved_documents": 0,
+                    "sources": [],
+                    "evidence": []
+                }
             return {
                 "response": self._no_verified_info_message(query),
                 "confidence": 0.2,
@@ -143,6 +151,36 @@ class RAGService:
             "price", "market", "gainers", "losers", "dividend", "ticker"
         ]
         return any(k in q for k in keywords)
+
+    def _is_smalltalk_query(self, query: str) -> bool:
+        q = query.strip().lower()
+        keywords = [
+            "hi", "hello", "hey", "hey there", "hi there", "yo",
+            "habari", "mambo", "niaje", "sasa", "vipi", "poa", "salama",
+            "shikamoo", "marahaba",
+            "how are you", "how are u", "how's it going", "how is it going",
+            "good morning", "good afternoon", "good evening", "good night",
+            "thanks", "thank you", "thx", "ty", "asante", "shukran", "nashukuru",
+            "welcome", "karibu"
+        ]
+        return any(k == q or k in q for k in keywords)
+
+    def _smalltalk_response(self, query: str) -> str:
+        style = detect_language_style(query)
+        if style == "kiswahili":
+            return (
+                "Habari! Niko hapa kusaidia. "
+                "Niulize kuhusu SACCO, benki, uwekezaji, bajeti, au mpango wa fedha."
+            )
+        if style == "code-switch":
+            return (
+                "Hello! Niko hapa kusaidia. "
+                "Niulize kuhusu SACCO, benki, uwekezaji, bajeti, au mpango wa fedha."
+            )
+        return (
+            "Hello! I’m here to help. "
+            "Ask me about SACCOs, banks, investing, budgeting, or financial planning."
+        )
 
     def _is_tbill_query(self, query: str) -> bool:
         q = query.lower()
