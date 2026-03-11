@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     auth_access_token_minutes: int = 60 * 24 * 7
     password_reset_token_ttl_minutes: int = 30
 
+    # CORS
+    cors_allow_origins: str = ""
+    cors_allow_origin_regex: str = r"https://.*\.vercel\.app"
+
     # Live Market Data (optional)
     nse_market_data_url: Optional[str] = None
     nse_market_category: Optional[str] = None
