@@ -1,10 +1,30 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { Wallet, Globe } from 'lucide-react'
 import AuthControls from './AuthControls'
+import { getMe } from '@/lib/api'
+
+type UserInfo = {
+  role?: string
+}
 
 export default function Header() {
+  const [user, setUser] = useState<UserInfo | null>(null)
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const me = await getMe()
+        setUser(me)
+      } catch {
+        setUser(null)
+      }
+    }
+    load()
+  }, [])
+
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
       <div className="max-w-6xl mx-auto px-4 py-4">
@@ -29,7 +49,9 @@ export default function Header() {
               <Link href="/profile" className="hover:text-gray-900">My Profile</Link>
               <Link href="/documents" className="hover:text-gray-900">Documents</Link>
               <Link href="/evaluation" className="hover:text-gray-900">Evaluation</Link>
-              <Link href="/admin" className="hover:text-gray-900">Admin</Link>
+              {user?.role === 'admin' && (
+                <Link href="/admin" className="hover:text-gray-900">Admin</Link>
+              )}
             </div>
             <AuthControls />
           </div>
