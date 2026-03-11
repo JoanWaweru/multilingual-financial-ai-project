@@ -60,6 +60,26 @@ class RAGService:
                         'metadata': {'source': 'Market data fallback guidance'},
                         'similarity_score': 0.9
                     })
+
+        # Add live CBK T-Bill auction results when relevant
+        if self._is_tbill_query(query):
+            tbill_snapshot = await market_data_service.get_cbk_tbill_snapshot()
+            if tbill_snapshot:
+                context.append({
+                    'text': tbill_snapshot,
+                    'metadata': {'source': 'CBK T-Bill auction results'},
+                    'similarity_score': 1.0
+                })
+
+        # Add live CMA MMF weekly stats when relevant
+        if self._is_mmf_query(query):
+            mmf_snapshot = await market_data_service.get_cma_mmf_snapshot()
+            if mmf_snapshot:
+                context.append({
+                    'text': mmf_snapshot,
+                    'metadata': {'source': 'CMA MMF weekly statistics'},
+                    'similarity_score': 1.0
+                })
         
         if settings.require_citations and not context:
             return {
@@ -121,6 +141,22 @@ class RAGService:
         keywords = [
             "nse", "shares", "stocks", "equity", "equities", "stock", "share",
             "price", "market", "gainers", "losers", "dividend", "ticker"
+        ]
+        return any(k in q for k in keywords)
+
+    def _is_tbill_query(self, query: str) -> bool:
+        q = query.lower()
+        keywords = [
+            "t-bill", "t-bills", "treasury bill", "treasury bills",
+            "auction results", "cbk", "treasury", "bill rate", "t bill"
+        ]
+        return any(k in q for k in keywords)
+
+    def _is_mmf_query(self, query: str) -> bool:
+        q = query.lower()
+        keywords = [
+            "mmf", "money market fund", "money market funds",
+            "collective investment", "cma", "weekly performance"
         ]
         return any(k in q for k in keywords)
     

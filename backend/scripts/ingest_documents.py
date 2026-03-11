@@ -247,24 +247,31 @@ Effective budgeting is the foundation of good financial management.
     ]
     
     print("📚 Ingesting sample Kenyan financial documents...")
-    
+
+    # Write sample documents (overwrite to keep content consistent)
     for doc in sample_docs:
         file_path = data_dir / doc["filename"]
         file_path.write_text(doc["content"], encoding='utf-8')
-        
-        # Process document
+
+    # Rebuild index for a clean ingest
+    vector_store._create_new_index()
+
+    # Ingest all supported files in sample_documents
+    supported_ext = {".txt", ".md", ".pdf", ".html", ".htm"}
+    for file_path in sorted(data_dir.iterdir()):
+        if file_path.suffix.lower() not in supported_ext:
+            continue
         with open(file_path, 'rb') as f:
             content = f.read()
-        
+
         texts, metadata = await processor.process_file(
             content,
-            filename=doc["filename"],
+            filename=file_path.name,
             content_type="text/plain"
         )
-        
-        # Add to vector store
+
         await vector_store.add_documents(texts, metadata)
-        print(f"✅ Ingested {doc['filename']}: {len(texts)} chunks")
+        print(f"✅ Ingested {file_path.name}: {len(texts)} chunks")
     
     stats = vector_store.get_stats()
     print(f"\n✅ Document ingestion complete!")

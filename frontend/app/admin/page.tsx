@@ -26,7 +26,7 @@ export default function AdminPage() {
   }, [])
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
+    <div className="max-w-5xl mx-auto px-4 py-6 bg-white text-gray-900 min-h-screen">
       <h2 className="text-xl font-semibold text-gray-900">Admin Dashboard</h2>
       {error && <div className="mt-4 text-sm text-gray-600">{error}</div>}
 

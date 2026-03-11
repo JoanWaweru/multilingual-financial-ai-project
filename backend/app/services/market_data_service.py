@@ -25,6 +25,7 @@ class MarketDataService:
     def __init__(self):
         self._cache: List[Dict] = []
         self._cache_ts: float = 0.0
+        self._cache_by_key: Dict[str, Dict] = {}
 
     async def get_market_snapshot(self, query: str) -> Optional[str]:
         """Return a compact market snapshot string tailored to the query."""
@@ -130,6 +131,96 @@ class MarketDataService:
         self._cache = data
         self._cache_ts = time.time()
         return data
+
+    async def get_cbk_tbill_snapshot(self) -> Optional[str]:
+        url = settings.cbk_tbill_results_url
+        if not url:
+            return None
+        rows = await self._get_feed_data("cbk_tbill", url, settings.cbk_tbill_cache_ttl_seconds)
+        if not rows:
+            return None
+        timestamp = time.strftime("%Y-%m-%d %H:%M %Z")
+        summary = self._summarize_rows(
+            rows,
+            preferred_fields=[
+                "auction_date", "issue_date", "maturity_date", "tenor", "term", "days",
+                "bid_rate", "rate", "yield", "average_rate", "amount", "offered", "accepted"
+            ],
+            max_rows=4
+        )
+        return (
+            f"Live CBK T-Bill auction results ({timestamp}, source: {url}). "
+            "Figures may change with new auctions. "
+            + summary
+        ).strip()
+
+    async def get_cma_mmf_snapshot(self) -> Optional[str]:
+        url = settings.cma_mmf_weekly_url
+        if not url:
+            return None
+        rows = await self._get_feed_data("cma_mmf", url, settings.cma_mmf_cache_ttl_seconds)
+        if not rows:
+            return None
+        timestamp = time.strftime("%Y-%m-%d %H:%M %Z")
+        summary = self._summarize_rows(
+            rows,
+            preferred_fields=[
+                "week_ending", "as_of", "fund", "scheme", "nav", "yield",
+                "return", "aum", "assets", "manager"
+            ],
+            max_rows=4
+        )
+        return (
+            f"Live CMA MMF weekly statistics ({timestamp}, source: {url}). "
+            "Figures may change with new weekly releases. "
+            + summary
+        ).strip()
+
+    async def _get_feed_data(self, key: str, url: str, ttl: int) -> List[Dict]:
+        cached = self._cache_by_key.get(key)
+        if cached and (time.time() - cached["ts"]) < ttl:
+            return cached["data"]
+
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                content_type = response.headers.get("content-type", "")
+                data = self._parse_response(response.text, content_type)
+        except Exception:
+            return cached["data"] if cached else []
+
+        self._cache_by_key[key] = {"data": data, "ts": time.time()}
+        return data
+
+    def _summarize_rows(self, rows: List[Dict], preferred_fields: List[str], max_rows: int = 4) -> str:
+        def pick_field(row: Dict, keys: List[str]) -> Optional[str]:
+            row_keys = {str(k).lower(): k for k in row.keys()}
+            for key in keys:
+                raw_key = row_keys.get(key.lower())
+                if raw_key is not None:
+                    val = row.get(raw_key)
+                    if val is not None and str(val).strip() != "":
+                        return f"{key}: {str(val).strip()}"
+            return None
+
+        lines = []
+        for row in rows[:max_rows]:
+            parts = []
+            for key in preferred_fields:
+                value = pick_field(row, [key])
+                if value:
+                    parts.append(value)
+                if len(parts) >= 4:
+                    break
+            if not parts:
+                # fallback: use first few non-empty fields
+                for k, v in list(row.items())[:4]:
+                    if v is not None and str(v).strip() != "":
+                        parts.append(f"{k}: {str(v).strip()}")
+            if parts:
+                lines.append("; ".join(parts))
+        return " | ".join(lines)
 
     def _parse_response(self, text: str, content_type: str) -> List[Dict]:
         text = text.strip()

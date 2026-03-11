@@ -12,8 +12,10 @@ from app.core.database import get_db
 from app.services.auth_service import (
     create_access_token,
     create_user,
+    create_password_reset,
     get_current_user,
     get_user_by_email,
+    reset_password_with_token,
     verify_password
 )
 
@@ -38,6 +40,20 @@ class AuthResponse(BaseModel):
     email: EmailStr
     full_name: Optional[str] = None
     role: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordResponse(BaseModel):
+    message: str
+    reset_token: Optional[str] = None
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
 
 
 @router.post("/register", response_model=AuthResponse)
@@ -81,3 +97,23 @@ async def me(current_user=Depends(get_current_user)):
         "full_name": current_user.full_name,
         "role": current_user.role
     }
+
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+async def forgot_password(request: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+    user = await get_user_by_email(db, request.email)
+    reset_token = None
+    if user and user.password_hash:
+        reset_token = await create_password_reset(db, user)
+    return ForgotPasswordResponse(
+        message="If the email exists, a reset token has been generated.",
+        reset_token=reset_token
+    )
+
+
+@router.post("/reset-password")
+async def reset_password(request: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    ok = await reset_password_with_token(db, request.token, request.new_password)
+    if not ok:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    return {"message": "Password reset successful"}

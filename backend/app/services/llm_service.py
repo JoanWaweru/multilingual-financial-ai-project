@@ -199,8 +199,8 @@ RESPONSE GUIDELINES:
                     )
 
             
-            # Calculate confidence (simple heuristic based on response length and structure)
-            confidence = self._calculate_confidence(content, context)
+            # Calculate confidence (weighted heuristic with forecasting penalty)
+            confidence = self._calculate_confidence(content, context, user_message)
 
             if settings.require_citations and context:
                 sources_list = self._extract_sources(context)
@@ -320,21 +320,61 @@ RESPONSE GUIDELINES:
 
 
     
-    def _calculate_confidence(self, response: str, context: List[Dict]) -> float:
+    def _calculate_confidence(self, response: str, context: List[Dict], user_message: str) -> float:
         """Calculate confidence score for the response"""
-        # Simple heuristic: higher confidence if we have context
-        base_confidence = 0.7
-        
-        if context and len(context) > 0:
-            base_confidence = 0.85
-        
-        # Lower confidence for very short or very long responses
-        if len(response) < 50:
-            base_confidence *= 0.8
-        elif len(response) > 2000:
-            base_confidence *= 0.9
-        
-        return min(1.0, max(0.3, base_confidence))
+        # Weighted confidence: C = wR*R + wS*S + wL*L
+        w_r, w_s, w_l = 0.4, 0.3, 0.3
+
+        # Retrieval relevance (mean similarity)
+        if context:
+            similarities = [c.get("similarity_score", 0.0) for c in context]
+            r = sum(similarities) / max(len(similarities), 1)
+        else:
+            r = 0.3
+
+        # Source quality (simple heuristic by source name)
+        s = 0.7
+        if context:
+            scores = []
+            for item in context:
+                source = (item.get("metadata", {}).get("source") or "").lower()
+                if any(key in source for key in ["cbk", "cma", "sasra", "rba", "kra"]):
+                    scores.append(1.0)
+                elif "nse" in source:
+                    scores.append(0.9)
+                elif "guide" in source or "policy" in source:
+                    scores.append(0.85)
+                else:
+                    scores.append(0.7)
+            s = sum(scores) / max(len(scores), 1)
+
+        # Response length completeness (cap at 1.0)
+        length = len(response)
+        l = min(1.0, max(0.3, length / 800.0))
+
+        confidence = (w_r * r) + (w_s * s) + (w_l * l)
+
+        # Penalize forecasting/prediction queries since outcomes are uncertain
+        if self._is_forecast_query(user_message):
+            confidence *= 0.75
+
+        return min(1.0, max(0.3, confidence))
+
+    def _is_forecast_query(self, text: str) -> bool:
+        import re
+        t = (text or "").lower()
+        patterns = [
+            r"\bnext\s+(week|month|quarter|year)\b",
+            r"\bwill\s+(the|nse|market|stocks|shares)\b",
+            r"\bwhat\s+will\s+(the\s+)?(market|nse|stocks|shares)\b",
+            r"\bforecast\b",
+            r"\bprediction\b",
+            r"\bpredict\b",
+            r"\boutlook\b",
+            r"\bwhere\s+is\s+(the\s+)?(market|nse)\s+going\b",
+            r"\bshould\s+i\s+(buy|sell)\s+(now|next)\b",
+        ]
+        return any(re.search(p, t) for p in patterns)
 
     def _has_unsupported_numbers(self, response: str, context_text: str) -> bool:
         import re

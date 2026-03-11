@@ -103,6 +103,11 @@ export interface AuthResponse {
   role: string
 }
 
+export interface ForgotPasswordResponse {
+  message: string
+  reset_token?: string
+}
+
 export async function registerUser(email: string, password: string, fullName?: string) {
   const response = await api.post<AuthResponse>('/api/auth/register', {
     email,
@@ -122,6 +127,21 @@ export async function loginUser(email: string, password: string) {
 
 export async function getMe() {
   const response = await api.get('/api/auth/me')
+  return response.data
+}
+
+export async function requestPasswordReset(email: string) {
+  const response = await api.post<ForgotPasswordResponse>('/api/auth/forgot-password', {
+    email,
+  })
+  return response.data
+}
+
+export async function resetPassword(token: string, newPassword: string) {
+  const response = await api.post('/api/auth/reset-password', {
+    token,
+    new_password: newPassword,
+  })
   return response.data
 }
 

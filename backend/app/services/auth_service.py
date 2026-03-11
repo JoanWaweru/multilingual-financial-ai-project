@@ -6,6 +6,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Optional
 from uuid import uuid4
+import hashlib
+import secrets
 
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -111,3 +113,35 @@ async def create_user(db: AsyncSession, email: str, password: str, full_name: Op
     await db.commit()
     await db.refresh(user)
     return user
+
+
+def _hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+async def create_password_reset(db: AsyncSession, user: User) -> str:
+    token = secrets.token_urlsafe(24)
+    user.reset_token_hash = _hash_reset_token(token)
+    user.reset_token_expires = datetime.utcnow() + timedelta(
+        minutes=settings.password_reset_token_ttl_minutes
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return token
+
+
+async def reset_password_with_token(db: AsyncSession, token: str, new_password: str) -> bool:
+    token_hash = _hash_reset_token(token)
+    result = await db.execute(select(User).where(User.reset_token_hash == token_hash))
+    user = result.scalar_one_or_none()
+    if not user:
+        return False
+    if not user.reset_token_expires or user.reset_token_expires < datetime.utcnow():
+        return False
+    user.password_hash = hash_password(new_password)
+    user.reset_token_hash = None
+    user.reset_token_expires = None
+    db.add(user)
+    await db.commit()
+    return True

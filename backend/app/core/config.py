@@ -48,11 +48,16 @@ class Settings(BaseSettings):
     auth_secret_key: str = "change-me"
     auth_algorithm: str = "HS256"
     auth_access_token_minutes: int = 60 * 24 * 7
+    password_reset_token_ttl_minutes: int = 30
 
     # Live Market Data (optional)
     nse_market_data_url: Optional[str] = None
     nse_market_category: Optional[str] = None
     nse_market_cache_ttl_seconds: int = 900
+    cbk_tbill_results_url: Optional[str] = None
+    cbk_tbill_cache_ttl_seconds: int = 3600
+    cma_mmf_weekly_url: Optional[str] = None
+    cma_mmf_cache_ttl_seconds: int = 3600
     
     class Config:
         env_file = ".env"

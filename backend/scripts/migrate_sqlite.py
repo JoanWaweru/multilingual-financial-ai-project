@@ -59,6 +59,10 @@ def main():
         cursor.execute("ALTER TABLE users ADD COLUMN full_name TEXT")
     if not _column_exists(cursor, "users", "role"):
         cursor.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'")
+    if not _column_exists(cursor, "users", "reset_token_hash"):
+        cursor.execute("ALTER TABLE users ADD COLUMN reset_token_hash TEXT")
+    if not _column_exists(cursor, "users", "reset_token_expires"):
+        cursor.execute("ALTER TABLE users ADD COLUMN reset_token_expires TIMESTAMP")
 
     cursor.execute(
         """
