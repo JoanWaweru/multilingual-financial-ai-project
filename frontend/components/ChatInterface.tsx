@@ -106,6 +106,7 @@ export default function ChatInterface() {
       }
 
       setMessages((prev) => [...prev, assistantMessage])
+      loadSessions() // refresh so title/summary from backend appear in header
     } catch (error) {
       console.error('Error sending message:', error)
       const errorMessage: Message = {
@@ -138,9 +139,21 @@ export default function ChatInterface() {
   }
 
   const filteredSessions = sessions.filter((s) => {
-    const text = `${s.title || ''} ${s.last_message || ''}`.toLowerCase()
+    const text = `${s.title || ''} ${s.summary || ''} ${s.last_message || ''}`.toLowerCase()
     return text.includes(search.toLowerCase())
   })
+
+  // Current session display label (title/summary for nav and header)
+  const currentSession = sessions.find((s) => s.session_id === sessionId)
+  const firstUserMessage = messages.find((m) => m.role === 'user')?.content ?? ''
+  const currentTitle =
+    currentSession?.title ||
+    currentSession?.summary ||
+    (firstUserMessage ? (firstUserMessage.slice(0, 50) + (firstUserMessage.length > 50 ? '...' : '')) : 'New chat')
+  const currentSummary =
+    currentSession?.summary && currentSession.summary !== currentTitle
+      ? currentSession.summary
+      : currentSession?.last_message
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -174,18 +187,28 @@ export default function ChatInterface() {
           {sessions.length === 0 && (
             <div className="text-xs text-gray-500">No sessions yet.</div>
           )}
-          {filteredSessions.map((s) => (
+          {filteredSessions.map((s) => {
+            const label = s.title || s.summary || s.last_message || 'New chat'
+            const sublabel = s.title ? (s.summary || s.last_message) : (s.summary && s.summary !== s.last_message ? s.summary : null)
+            return (
             <div
               key={s.session_id}
-              className={`w-full text-left text-xs rounded px-2 py-2 border ${
-                s.session_id === sessionId ? 'border-primary-600 bg-white' : 'border-gray-200 bg-white'
+              className={`w-full text-left rounded px-2 py-2 border ${
+                s.session_id === sessionId ? 'border-primary-600 bg-white ring-1 ring-primary-500' : 'border-gray-200 bg-white'
               }`}
             >
               <button
                 onClick={() => setSessionId(s.session_id)}
-                className="w-full text-left"
+                className="w-full text-left group"
               >
-                <div className="font-medium truncate">{s.title || s.summary || s.last_message}</div>
+                <div className="font-medium text-sm text-gray-900 line-clamp-2" title={label}>
+                  {label}
+                </div>
+                {sublabel && (
+                  <div className="text-xs text-gray-500 mt-0.5 line-clamp-2" title={sublabel}>
+                    {sublabel}
+                  </div>
+                )}
               </button>
               {s.last_updated && (
                 <div className="text-[10px] text-gray-500 mt-1">{s.last_updated}</div>
@@ -254,15 +277,24 @@ export default function ChatInterface() {
                 )}
               </div>
             </div>
-          ))}
+          )})}
         </div>
       </div>
 
       <div className="flex-1 flex flex-col min-w-0">
-      {/* Chat Header */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between p-4 border-b border-gray-200 bg-gray-50">
-        <h2 className="text-lg font-semibold text-gray-900">Chat</h2>
-        <div className="flex items-center space-x-2">
+      {/* Chat Header: current chat title and summary */}
+      <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between p-4 border-b border-gray-200 bg-gray-50">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-semibold text-gray-900 truncate" title={currentTitle}>
+            {currentTitle}
+          </h2>
+          {currentSummary && (
+            <p className="text-sm text-gray-600 truncate mt-0.5" title={currentSummary}>
+              {currentSummary.length > 72 ? currentSummary.slice(0, 72) + '...' : currentSummary}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center space-x-2 shrink-0 mt-2 md:mt-0">
             <button
               onClick={handleNewChat}
               className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
