@@ -32,7 +32,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={`${inter.className} min-h-screen bg-slate-50 text-gray-900 antialiased`}>
+        {children}
+      </body>
     </html>
   )
 }

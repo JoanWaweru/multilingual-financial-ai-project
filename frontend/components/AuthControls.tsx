@@ -117,8 +117,8 @@ export default function AuthControls() {
   }
 
   return (
-    <div className="flex flex-col items-start space-y-2 text-sm">
-      <div className="flex items-center space-x-2">
+    <div className="flex flex-col items-start space-y-2 text-sm w-full">
+      <div className="flex w-full flex-col items-start gap-2 md:flex-row md:items-center">
         {isRegister && (
           <input
             type="text"
@@ -164,13 +164,13 @@ export default function AuthControls() {
       </div>
 
       {showReset && (
-        <div className="flex flex-wrap items-center gap-2 rounded border border-gray-200 bg-white p-2">
+        <div className="flex w-full flex-col gap-2 rounded border border-gray-200 bg-white p-2 md:flex-row md:items-center">
           <input
             type="email"
             placeholder="Email for reset"
             value={resetEmail}
             onChange={(e) => setResetEmail(e.target.value)}
-            className="border border-gray-300 rounded px-2 py-1 text-xs bg-white text-gray-900 placeholder:text-gray-500"
+            className="border border-gray-300 rounded px-2 py-1 text-xs bg-white text-gray-900 placeholder:text-gray-500 w-full md:w-auto"
           />
           <button
             onClick={handleRequestReset}
@@ -184,14 +184,14 @@ export default function AuthControls() {
             placeholder="Reset token"
             value={resetToken}
             onChange={(e) => setResetToken(e.target.value)}
-            className="border border-gray-300 rounded px-2 py-1 text-xs bg-white text-gray-900 placeholder:text-gray-500"
+            className="border border-gray-300 rounded px-2 py-1 text-xs bg-white text-gray-900 placeholder:text-gray-500 w-full md:w-auto"
           />
           <input
             type="password"
             placeholder="New password"
             value={resetPasswordValue}
             onChange={(e) => setResetPasswordValue(e.target.value)}
-            className="border border-gray-300 rounded px-2 py-1 text-xs bg-white text-gray-900 placeholder:text-gray-500"
+            className="border border-gray-300 rounded px-2 py-1 text-xs bg-white text-gray-900 placeholder:text-gray-500 w-full md:w-auto"
           />
           <button
             onClick={handleResetPassword}

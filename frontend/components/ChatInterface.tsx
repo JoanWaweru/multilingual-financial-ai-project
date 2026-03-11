@@ -150,7 +150,7 @@ export default function ChatInterface() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-200px)] bg-white rounded-lg shadow-lg border border-gray-200">
+    <div className="flex flex-col md:flex-row w-full min-h-[calc(100vh-220px)] md:h-[calc(100vh-200px)] bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
       {/* Sidebar */}
       <div className="w-64 border-r border-gray-200 bg-gray-50 p-3 hidden md:block">
         <div className="flex items-center justify-between">
@@ -258,9 +258,9 @@ export default function ChatInterface() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
       {/* Chat Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between p-4 border-b border-gray-200 bg-gray-50">
         <h2 className="text-lg font-semibold text-gray-900">Chat</h2>
         <div className="flex items-center space-x-2">
             <button
@@ -314,21 +314,21 @@ export default function ChatInterface() {
 
       {/* Input */}
       <div className="p-4 border-t border-gray-200 bg-gray-50">
-        <div className="flex items-end space-x-2">
+        <div className="flex flex-col gap-2 md:flex-row md:items-end">
           <textarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Ask about SACCOs, investments, budgeting..."
-              className="flex-1 resize-none border border-gray-300 rounded-lg px-4 py-3 bg-white text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            className="flex-1 resize-none border border-gray-300 rounded-lg px-4 py-3 bg-white text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent w-full"
             rows={1}
             style={{ minHeight: '48px', maxHeight: '120px' }}
           />
           <button
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
-            className="p-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="p-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors md:self-end"
           >
             <Send className="w-5 h-5" />
           </button>
