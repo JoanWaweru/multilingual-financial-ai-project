@@ -164,7 +164,7 @@ export default function AuthControls() {
       </div>
 
       {showReset && (
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2 rounded border border-gray-200 bg-white p-2">
           <input
             type="email"
             placeholder="Email for reset"
@@ -175,7 +175,7 @@ export default function AuthControls() {
           <button
             onClick={handleRequestReset}
             disabled={loading || !resetEmail}
-            className="px-3 py-1 text-xs rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+            className="px-3 py-1 text-xs rounded bg-primary-600 text-white disabled:opacity-50"
           >
             Send reset token
           </button>
