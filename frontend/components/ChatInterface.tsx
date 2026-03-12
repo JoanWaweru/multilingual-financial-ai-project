@@ -28,7 +28,16 @@ export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [sessionId, setSessionId] = useState(() => generateSessionId())
+  const [sessionId, setSessionId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem('kfa_session_id')
+      if (stored) return stored
+      const fresh = generateSessionId()
+      window.localStorage.setItem('kfa_session_id', fresh)
+      return fresh
+    }
+    return generateSessionId()
+  })
   const [sessions, setSessions] = useState<Array<{ session_id: string; title?: string; summary?: string; last_message: string; pinned?: boolean; last_updated?: string }>>([])
   const [search, setSearch] = useState('')
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -135,7 +144,11 @@ export default function ChatInterface() {
 
   const handleNewChat = () => {
     setMessages([])
-    setSessionId(generateSessionId())
+    const newId = generateSessionId()
+    setSessionId(newId)
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('kfa_session_id', newId)
+    }
   }
 
   const filteredSessions = sessions.filter((s) => {
@@ -198,7 +211,12 @@ export default function ChatInterface() {
               }`}
             >
               <button
-                onClick={() => setSessionId(s.session_id)}
+                onClick={() => {
+                  setSessionId(s.session_id)
+                  if (typeof window !== 'undefined') {
+                    window.localStorage.setItem('kfa_session_id', s.session_id)
+                  }
+                }}
                 className="w-full text-left group"
               >
                 <div className="font-medium text-sm text-gray-900 line-clamp-2" title={label}>

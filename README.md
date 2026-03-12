@@ -76,6 +76,7 @@ ANTHROPIC_API_KEY=your_anthropic_api_key
 DATABASE_URL=sqlite:///./database/financial_advisor.db
 EMBEDDING_MODEL=text-embedding-3-small
 LLM_MODEL=claude-sonnet-4-6
+# Optional: MAX_CHAT_HISTORY=40  (how many recent messages the model sees; default 40)
 ```
 
 **frontend/.env.local**:

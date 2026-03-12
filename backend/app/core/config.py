@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     top_k_retrieval: int = 5
     
     # Memory Settings
-    max_chat_history: int = 20
+    max_chat_history: int = 40  # last N messages sent to LLM as context (e.g. 40 ≈ 20 exchanges)
     session_timeout: int = 3600  # 1 hour in seconds
     
     # Safety & Ethics
