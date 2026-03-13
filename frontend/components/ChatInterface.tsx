@@ -330,6 +330,15 @@ export default function ChatInterface() {
             >
               <button
                 onClick={() => {
+                  if (s.session_id === sessionId) return
+                  if (typeof window !== 'undefined' && isGuest === true && messages.length > 0) {
+                    const firstUser = messages.find((m) => m.role === 'user')?.content ?? ''
+                    const title = firstUser ? (firstUser.slice(0, 50) + (firstUser.length > 50 ? '...' : '')) : 'Chat'
+                    const list = getGuestSessionsFromStorage().filter((x) => x.session_id !== sessionId)
+                    list.unshift({ session_id: sessionId, title })
+                    saveGuestSessionsToStorage(list)
+                    setGuestSessions(list)
+                  }
                   setSessionId(s.session_id)
                   if (typeof window !== 'undefined') {
                     window.localStorage.setItem('kfa_session_id', s.session_id)
