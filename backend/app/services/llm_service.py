@@ -87,16 +87,10 @@ RESPONSE GUIDELINES:
                 "content": f"Relevant financial information:\n{context_text}\n\nUse this information to provide accurate, context-aware responses."
             })
             if settings.require_citations:
-                sources_list = self._extract_sources(context)
-                if sources_list:
-                    messages.append({
-                        "role": "system",
-                        "content": (
-                            "Answer only using the provided sources. "
-                            f"End your response with a final line: {self._citation_label(expected_style or 'english')} "
-                            + "; ".join(sources_list)
-                        )
-                    })
+                messages.append({
+                    "role": "system",
+                    "content": "Answer only using the provided sources. Do not add a Sources or Vyanzo line at the end of your response."
+                })
             if "Live NSE market snapshot" in context_text:
                 messages.append({
                     "role": "system",
@@ -202,17 +196,12 @@ RESPONSE GUIDELINES:
             # Calculate confidence (weighted heuristic with forecasting penalty)
             confidence = self._calculate_confidence(content, context, user_message)
 
-            if settings.require_citations and context:
-                sources_list = self._extract_sources(context)
-                label = self._citation_label(expected_style or "english")
-                has_label = label.lower() in content.lower()
-                has_source = any(source.lower() in content.lower() for source in sources_list)
-                if sources_list and not (has_label and has_source):
+            if context:
+                context_text = self._format_context(context)
+                if self._has_unsupported_numbers(content, context_text):
                     content = self._no_verified_info_message(user_message)
-                else:
-                    context_text = self._format_context(context)
-                    if self._has_unsupported_numbers(content, context_text):
-                        content = self._no_verified_info_message(user_message)
+            # Strip any trailing Sources/Vyanzo line the model might still add
+            content = self._strip_sources_line(content)
 
             # If code-switch was requested but the response isn't compliant, keep the
             # response (it may still be correct); don't replace with "no verified info"
@@ -286,6 +275,19 @@ RESPONSE GUIDELINES:
             if source and source not in sources:
                 sources.append(source)
         return sources
+
+    def _strip_sources_line(self, content: str) -> str:
+        """Remove a trailing 'Sources: ...' or 'Vyanzo: ...' line from the response."""
+        if not content or not content.strip():
+            return content
+        lines = content.rstrip().split("\n")
+        while lines:
+            last = lines[-1].strip().lower()
+            if last.startswith("sources:") or last.startswith("vyanzo:") or last.startswith("sources/vyanzo:"):
+                lines.pop()
+                continue
+            break
+        return "\n".join(lines).rstrip()
 
     def _no_verified_info_message(self, user_message: str) -> str:
         style = detect_language_style(user_message)

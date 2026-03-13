@@ -1,9 +1,12 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, Trash2, Loader2, Plus, Pin, PinOff, Trash } from 'lucide-react'
+import Link from 'next/link'
+import { Send, Trash2, Loader2, Plus, Pin, PinOff, Trash, X } from 'lucide-react'
 import MessageBubble from './MessageBubble'
-import { sendMessage, clearChat, getChatHistory, getChatSessions, renameChat, pinChat, deleteChat } from '@/lib/api'
+import { sendMessage, clearChat, getChatHistory, getChatSessions, renameChat, pinChat, deleteChat, getMe } from '@/lib/api'
+
+const GUEST_SESSIONS_KEY = 'kfa_guest_sessions'
 
 // Simple UUID generator for session IDs
 function generateSessionId(): string {
@@ -12,6 +15,23 @@ function generateSessionId(): string {
     const v = c === 'x' ? r : (r & 0x3 | 0x8)
     return v.toString(16)
   })
+}
+
+function getGuestSessionsFromStorage(): Array<{ session_id: string; title: string }> {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(GUEST_SESSIONS_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function saveGuestSessionsToStorage(list: Array<{ session_id: string; title: string }>) {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(GUEST_SESSIONS_KEY, JSON.stringify(list))
 }
 
 interface Message {
@@ -39,16 +59,70 @@ export default function ChatInterface() {
     return generateSessionId()
   })
   const [sessions, setSessions] = useState<Array<{ session_id: string; title?: string; summary?: string; last_message: string; pinned?: boolean; last_updated?: string }>>([])
+  const [guestSessions, setGuestSessions] = useState<Array<{ session_id: string; title: string }>>([])
   const [search, setSearch] = useState('')
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
+  const [isGuest, setIsGuest] = useState<boolean | null>(null)
+  const [showGuestSaveBanner, setShowGuestSaveBanner] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
+    const checkGuest = async () => {
+      if (typeof window === 'undefined') return
+      const token = window.localStorage.getItem('auth_token')
+      if (token) {
+        try {
+          await getMe()
+          setIsGuest(false)
+          return
+        } catch {
+          setIsGuest(true)
+        }
+      } else {
+        setIsGuest(true)
+      }
+    }
+    checkGuest()
+  }, [])
+
+  useEffect(() => {
+    if (isGuest !== true) return
+    if (typeof window !== 'undefined' && window.sessionStorage.getItem('kfa_guest_banner_dismissed')) return
+    const timer = setTimeout(async () => {
+      try {
+        await getMe()
+        setIsGuest(false)
+      } catch {
+        setShowGuestSaveBanner(true)
+      }
+    }, 90000)
+    return () => clearTimeout(timer)
+  }, [isGuest])
+
+  useEffect(() => {
+    if (isGuest !== true) return
+    if (typeof window !== 'undefined' && window.sessionStorage.getItem('kfa_guest_banner_dismissed')) return
+    if (messages.length < 2) return
+    const show = async () => {
+      try {
+        await getMe()
+        setIsGuest(false)
+      } catch {
+        setShowGuestSaveBanner(true)
+      }
+    }
+    show()
+  }, [isGuest, messages.length])
+
+  useEffect(() => {
     loadHistory()
     loadSessions()
-  }, [sessionId])
+    if (typeof window !== 'undefined' && isGuest === true) {
+      setGuestSessions(getGuestSessionsFromStorage())
+    }
+  }, [sessionId, isGuest])
 
   useEffect(() => {
     scrollToBottom()
@@ -143,6 +217,14 @@ export default function ChatInterface() {
   }
 
   const handleNewChat = () => {
+    if (typeof window !== 'undefined' && isGuest === true && messages.length > 0) {
+      const firstUser = messages.find((m) => m.role === 'user')?.content ?? ''
+      const title = firstUser ? (firstUser.slice(0, 50) + (firstUser.length > 50 ? '...' : '')) : 'Chat'
+      const list = getGuestSessionsFromStorage().filter((s) => s.session_id !== sessionId)
+      list.unshift({ session_id: sessionId, title })
+      saveGuestSessionsToStorage(list)
+      setGuestSessions(list)
+    }
     setMessages([])
     const newId = generateSessionId()
     setSessionId(newId)
@@ -151,13 +233,24 @@ export default function ChatInterface() {
     }
   }
 
-  const filteredSessions = sessions.filter((s) => {
+  const sidebarSessions = isGuest
+    ? guestSessions.map((s) => ({
+        session_id: s.session_id,
+        title: s.title,
+        summary: '',
+        last_message: s.title,
+        pinned: false,
+        last_updated: undefined,
+      }))
+    : sessions
+
+  const filteredSessions = sidebarSessions.filter((s) => {
     const text = `${s.title || ''} ${s.summary || ''} ${s.last_message || ''}`.toLowerCase()
     return text.includes(search.toLowerCase())
   })
 
   // Current session display label (title/summary for nav and header)
-  const currentSession = sessions.find((s) => s.session_id === sessionId)
+  const currentSession = sidebarSessions.find((s) => s.session_id === sessionId)
   const firstUserMessage = messages.find((m) => m.role === 'user')?.content ?? ''
   const currentTitle =
     currentSession?.title ||
@@ -175,8 +268,31 @@ export default function ChatInterface() {
     }
   }
 
+  const dismissGuestBanner = () => {
+    setShowGuestSaveBanner(false)
+    if (typeof window !== 'undefined') window.sessionStorage.setItem('kfa_guest_banner_dismissed', '1')
+  }
+
   return (
-    <div className="flex flex-col md:flex-row w-full min-h-[calc(100vh-220px)] md:h-[calc(100vh-200px)] bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+    <div className="flex flex-col w-full min-h-[calc(100vh-220px)] md:h-[calc(100vh-200px)] bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+      {/* Guest: save-your-chats notification */}
+      {showGuestSaveBanner && isGuest && (
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-blue-50 border-b border-blue-200 text-sm text-blue-900 shrink-0">
+          <p className="flex-1">
+            To save your chats and access them from any device, please{' '}
+            <Link href="/" className="font-medium underline hover:text-blue-700">log in or register</Link> (use the menu above).
+          </p>
+          <button
+            onClick={dismissGuestBanner}
+            className="shrink-0 p-1 rounded hover:bg-blue-100 text-blue-700"
+            title="Dismiss"
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+      <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
       {/* Sidebar */}
       <div className="w-64 border-r border-gray-200 bg-gray-50 p-3 hidden md:block">
         <div className="flex items-center justify-between">
@@ -197,8 +313,10 @@ export default function ChatInterface() {
           className="mt-3 w-full border border-gray-300 rounded px-2 py-1 text-xs"
         />
         <div className="mt-3 space-y-2 overflow-y-auto max-h-[calc(100vh-330px)]">
-          {sessions.length === 0 && (
-            <div className="text-xs text-gray-500">No sessions yet.</div>
+          {filteredSessions.length === 0 && (
+            <div className="text-xs text-gray-500">
+              {isGuest ? 'Start a chat; previous chats appear here when you start a new one.' : 'No sessions yet.'}
+            </div>
           )}
           {filteredSessions.map((s) => {
             const label = s.title || s.summary || s.last_message || 'New chat'
@@ -231,6 +349,7 @@ export default function ChatInterface() {
               {s.last_updated && (
                 <div className="text-[10px] text-gray-500 mt-1">{s.last_updated}</div>
               )}
+              {!isGuest && (
               <div className="mt-2">
                 {renamingId === s.session_id ? (
                   <div className="flex items-center space-x-2">
@@ -294,6 +413,23 @@ export default function ChatInterface() {
                   </div>
                 )}
               </div>
+              )}
+              {isGuest && (
+                <div className="mt-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const list = getGuestSessionsFromStorage().filter((x) => x.session_id !== s.session_id)
+                      saveGuestSessionsToStorage(list)
+                      setGuestSessions(list)
+                      if (s.session_id === sessionId) handleNewChat()
+                    }}
+                    className="text-[10px] text-gray-500 hover:text-red-600"
+                  >
+                    Remove from list
+                  </button>
+                </div>
+              )}
             </div>
           )})}
         </div>
@@ -384,6 +520,7 @@ export default function ChatInterface() {
           </button>
           </div>
         </div>
+      </div>
       </div>
     </div>
   )

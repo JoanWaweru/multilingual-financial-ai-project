@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { User, Bot, ExternalLink, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { User, Bot, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { Message } from '@/types'
 import { submitFeedback } from '@/lib/api'
 
@@ -66,12 +66,6 @@ export default function MessageBubble({ message, sessionId }: MessageBubbleProps
             <div className="mt-2 pt-2 border-t border-gray-300">
               <div className="flex items-center justify-between text-xs text-gray-600">
                 <span>Confidence: {(message.confidence * 100).toFixed(0)}%</span>
-                {message.sources && message.sources.length > 0 && (
-                  <div className="flex items-center space-x-1">
-                    <ExternalLink className="w-3 h-3" />
-                    <span>{message.sources.length} source(s)</span>
-                  </div>
-                )}
               </div>
               {!feedbackSent && (
                 <div className="mt-2 flex items-center space-x-2 text-xs text-gray-600">
@@ -100,19 +94,6 @@ export default function MessageBubble({ message, sessionId }: MessageBubbleProps
               )}
               {feedbackSent && (
                 <div className="mt-2 text-xs text-gray-500">Thanks for your feedback.</div>
-              )}
-              {message.evidence && message.evidence.length > 0 && (
-                <details className="mt-2 text-xs text-gray-600">
-                  <summary className="cursor-pointer">Evidence snippets</summary>
-                  <div className="mt-2 space-y-2">
-                    {message.evidence.map((item, idx) => (
-                      <div key={idx} className="border border-gray-200 rounded p-2">
-                        <div className="font-medium">{item.source}</div>
-                        <div className="mt-1">{item.text}</div>
-                      </div>
-                    ))}
-                  </div>
-                </details>
               )}
             </div>
           )}

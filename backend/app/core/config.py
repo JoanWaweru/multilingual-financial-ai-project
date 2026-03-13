@@ -55,11 +55,10 @@ class Settings(BaseSettings):
     cors_allow_origins: str = ""
     cors_allow_origin_regex: str = r"https://.*\.vercel\.app"
 
-    # Live Market Data (optional)
-    nse_market_data_url: Optional[str] = None
+    # Live Market Data
+    nse_market_data_url: [str] = "https://www.nse.co.ke/dataservices/market-statistics"
     nse_market_category: Optional[str] = None
-    nse_market_cache_ttl_seconds: int = 900
-    cbk_tbill_results_url: Optional[str] = None
+    cbk_tbill_results_url: [str] = "https://www.centralbank.go.ke/bills-bonds/treasury-bills/"
     cbk_tbill_cache_ttl_seconds: int = 3600
     cma_mmf_weekly_url: Optional[str] = None
     cma_mmf_cache_ttl_seconds: int = 3600
