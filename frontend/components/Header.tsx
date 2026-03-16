@@ -15,10 +15,17 @@ export default function Header() {
 
   useEffect(() => {
     const load = async () => {
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        setUser(null)
+        return
+      }
+
       try {
         const me = await getMe()
         setUser(me)
       } catch {
+        localStorage.removeItem('auth_token')
         setUser(null)
       }
     }
@@ -60,4 +67,3 @@ export default function Header() {
     </header>
   )
 }
-
