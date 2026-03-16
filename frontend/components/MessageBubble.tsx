@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { User, Bot, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { User, Bot, ThumbsUp, ThumbsDown, Pencil } from 'lucide-react'
 import { Message } from '@/types'
 import { submitFeedback } from '@/lib/api'
 
@@ -10,6 +10,8 @@ interface MessageBubbleProps {
     evidence?: Array<{ text: string; source: string; similarity: number }>
   }
   sessionId: string
+  canEdit?: boolean
+  onEdit?: (content: string) => void
 }
 
 function formatAssistantMessage(text: string): { __html: string } {
@@ -31,7 +33,7 @@ function formatAssistantMessage(text: string): { __html: string } {
   return { __html: withLineBreaks }
 }
 
-export default function MessageBubble({ message, sessionId }: MessageBubbleProps) {
+export default function MessageBubble({ message, sessionId, canEdit, onEdit }: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const formattedContent = !isUser ? formatAssistantMessage(message.content) : null
   const [feedbackSent, setFeedbackSent] = useState(false)
@@ -54,7 +56,19 @@ export default function MessageBubble({ message, sessionId }: MessageBubbleProps
             : 'bg-gray-100 text-gray-900'
         }`}>
           {isUser ? (
-            <p className="whitespace-pre-wrap break-words">{message.content}</p>
+            <div className="space-y-1">
+              <p className="whitespace-pre-wrap break-words">{message.content}</p>
+              {canEdit && onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit(message.content)}
+                  className="mt-1 inline-flex items-center space-x-1 text-[10px] text-primary-100/90 hover:text-white"
+                >
+                  <Pencil className="w-3 h-3" />
+                  <span>Edit and resend</span>
+                </button>
+              )}
+            </div>
           ) : (
             <p
               className="whitespace-pre-wrap break-words"

@@ -22,6 +22,7 @@ export default function AuthControls() {
   const [resetToken, setResetToken] = useState('')
   const [resetPasswordValue, setResetPasswordValue] = useState('')
   const [resetInfo, setResetInfo] = useState<string | null>(null)
+  const [showModal, setShowModal] = useState(false)
 
   useEffect(() => {
     const init = async () => {
@@ -117,94 +118,124 @@ export default function AuthControls() {
   }
 
   return (
-    <div className="flex flex-col items-start space-y-2 text-sm w-full">
-      <div className="flex w-full flex-col items-start gap-2 md:flex-row md:items-center">
-        {isRegister && (
-          <input
-            type="text"
-            placeholder="Full name"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            className="border border-gray-300 rounded px-2 py-1 text-xs bg-white text-gray-900 placeholder:text-gray-500"
-          />
-        )}
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="border border-gray-300 rounded px-2 py-1 text-xs bg-white text-gray-900 placeholder:text-gray-500"
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="border border-gray-300 rounded px-2 py-1 text-xs bg-white text-gray-900 placeholder:text-gray-500"
-        />
-        <button
-          onClick={handleAuth}
-          disabled={loading || !email || !password}
-          className="px-3 py-1 text-xs rounded bg-primary-600 text-white disabled:opacity-50"
-        >
-          {isRegister ? 'Register' : 'Login'}
-        </button>
-        <button
-          onClick={() => setIsRegister(!isRegister)}
-          className="px-2 py-1 text-xs text-gray-600 hover:text-gray-900"
-        >
-          {isRegister ? 'Have account?' : 'Create account'}
-        </button>
-        <button
-          onClick={() => setShowReset(!showReset)}
-          className="px-2 py-1 text-xs text-gray-600 hover:text-gray-900"
-        >
-          Forgot password?
-        </button>
-      </div>
+    <>
+      <button
+        onClick={() => setShowModal(true)}
+        className="px-3 py-1 text-xs rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+      >
+        Log in / Register
+      </button>
 
-      {showReset && (
-        <div className="flex w-full flex-col gap-2 rounded border border-gray-200 bg-white p-2 md:flex-row md:items-center">
-          <input
-            type="email"
-            placeholder="Email for reset"
-            value={resetEmail}
-            onChange={(e) => setResetEmail(e.target.value)}
-            className="border border-gray-300 rounded px-2 py-1 text-xs bg-white text-gray-900 placeholder:text-gray-500 w-full md:w-auto"
-          />
-          <button
-            onClick={handleRequestReset}
-            disabled={loading || !resetEmail}
-            className="px-3 py-1 text-xs rounded bg-primary-600 text-white disabled:opacity-50"
-          >
-            Send reset token
-          </button>
-          <input
-            type="text"
-            placeholder="Reset token"
-            value={resetToken}
-            onChange={(e) => setResetToken(e.target.value)}
-            className="border border-gray-300 rounded px-2 py-1 text-xs bg-white text-gray-900 placeholder:text-gray-500 w-full md:w-auto"
-          />
-          <input
-            type="password"
-            placeholder="New password"
-            value={resetPasswordValue}
-            onChange={(e) => setResetPasswordValue(e.target.value)}
-            className="border border-gray-300 rounded px-2 py-1 text-xs bg-white text-gray-900 placeholder:text-gray-500 w-full md:w-auto"
-          />
-          <button
-            onClick={handleResetPassword}
-            disabled={loading || !resetToken || !resetPasswordValue}
-            className="px-3 py-1 text-xs rounded bg-primary-600 text-white disabled:opacity-50"
-          >
-            Reset password
-          </button>
+      {showModal && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-lg bg-white shadow-lg p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-gray-900">
+                {isRegister ? 'Create account' : 'Login'}
+              </h2>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-xs text-gray-500 hover:text-gray-800"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="flex flex-col space-y-3 text-sm">
+              {isRegister && (
+                <input
+                  type="text"
+                  placeholder="Full name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="border border-gray-300 rounded px-2 py-1 text-xs bg-white text-gray-900 placeholder:text-gray-500"
+                />
+              )}
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="border border-gray-300 rounded px-2 py-1 text-xs bg-white text-gray-900 placeholder:text-gray-500"
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="border border-gray-300 rounded px-2 py-1 text-xs bg-white text-gray-900 placeholder:text-gray-500"
+              />
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  onClick={handleAuth}
+                  disabled={loading || !email || !password}
+                  className="px-3 py-1 text-xs rounded bg-primary-600 text-white disabled:opacity-50"
+                >
+                  {isRegister ? 'Register' : 'Login'}
+                </button>
+                <button
+                  onClick={() => {
+                    setIsRegister(!isRegister)
+                    setShowReset(false)
+                  }}
+                  className="px-2 py-1 text-xs text-gray-600 hover:text-gray-900"
+                >
+                  {isRegister ? 'Have account?' : 'Create account'}
+                </button>
+                <button
+                  onClick={() => setShowReset(!showReset)}
+                  className="px-2 py-1 text-xs text-gray-600 hover:text-gray-900"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            </div>
+
+            {showReset && (
+              <div className="mt-2 flex w-full flex-col gap-2 rounded border border-gray-200 bg-white p-2 text-xs">
+                <input
+                  type="email"
+                  placeholder="Email for reset"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  className="border border-gray-300 rounded px-2 py-1 bg-white text-gray-900 placeholder:text-gray-500"
+                />
+                <button
+                  onClick={handleRequestReset}
+                  disabled={loading || !resetEmail}
+                  className="px-3 py-1 rounded bg-primary-600 text-white disabled:opacity-50"
+                >
+                  Send reset token
+                </button>
+                <input
+                  type="text"
+                  placeholder="Reset token"
+                  value={resetToken}
+                  onChange={(e) => setResetToken(e.target.value)}
+                  className="border border-gray-300 rounded px-2 py-1 bg-white text-gray-900 placeholder:text-gray-500"
+                />
+                <input
+                  type="password"
+                  placeholder="New password"
+                  value={resetPasswordValue}
+                  onChange={(e) => setResetPasswordValue(e.target.value)}
+                  className="border border-gray-300 rounded px-2 py-1 bg-white text-gray-900 placeholder:text-gray-500"
+                />
+                <button
+                  onClick={handleResetPassword}
+                  disabled={loading || !resetToken || !resetPasswordValue}
+                  className="px-3 py-1 rounded bg-primary-600 text-white disabled:opacity-50"
+                >
+                  Reset password
+                </button>
+              </div>
+            )}
+
+            {resetInfo && <span className="text-xs text-gray-600">{resetInfo}</span>}
+            {error && <span className="text-xs text-red-600">{error}</span>}
+          </div>
         </div>
       )}
-
-      {resetInfo && <span className="text-xs text-gray-600">{resetInfo}</span>}
-      {error && <span className="text-xs text-red-600">{error}</span>}
-    </div>
+    </>
   )
 }

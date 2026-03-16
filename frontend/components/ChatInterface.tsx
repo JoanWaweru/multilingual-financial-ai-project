@@ -153,10 +153,17 @@ export default function ChatInterface() {
   }
 
   const loadSessions = async () => {
+    // Only fetch server-side sessions when the user is logged in
+    if (isGuest !== false) return
+    if (typeof window !== 'undefined') {
+      const token = window.localStorage.getItem('auth_token')
+      if (!token) return
+    }
     try {
       const data = await getChatSessions()
       setSessions(data.sessions || [])
     } catch (error) {
+      // If the call fails (e.g. 401), fall back to guest behaviour
       setSessions([])
     }
   }
@@ -271,6 +278,13 @@ export default function ChatInterface() {
   const dismissGuestBanner = () => {
     setShowGuestSaveBanner(false)
     if (typeof window !== 'undefined') window.sessionStorage.setItem('kfa_guest_banner_dismissed', '1')
+  }
+
+  const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user')
+
+  const handleEditLastUser = (content: string) => {
+    setInput(content)
+    inputRef.current?.focus()
   }
 
   return (
@@ -489,7 +503,13 @@ export default function ChatInterface() {
           </div>
         )}
         {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} sessionId={sessionId} />
+          <MessageBubble
+            key={message.id}
+            message={message}
+            sessionId={sessionId}
+            canEdit={message.role === 'user' && message.id === lastUserMessage?.id}
+            onEdit={handleEditLastUser}
+          />
         ))}
         {isLoading && (
           <div className="flex items-center space-x-2 text-gray-500">
