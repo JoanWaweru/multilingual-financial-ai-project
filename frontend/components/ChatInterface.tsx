@@ -68,23 +68,34 @@ export default function ChatInterface() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  useEffect(() => {
-    const checkGuest = async () => {
-      if (typeof window === 'undefined') return
-      const token = window.localStorage.getItem('auth_token')
-      if (token) {
-        try {
-          await getMe()
-          setIsGuest(false)
-          return
-        } catch {
-          setIsGuest(true)
-        }
-      } else {
-        setIsGuest(true)
-      }
+  const refreshAuthState = async () => {
+    if (typeof window === 'undefined') return
+    const token = window.localStorage.getItem('auth_token')
+    if (!token) {
+      setIsGuest(true)
+      return
     }
-    checkGuest()
+    try {
+      await getMe()
+      setIsGuest(false)
+    } catch {
+      setIsGuest(true)
+      window.localStorage.removeItem('auth_token')
+    }
+  }
+
+  useEffect(() => {
+    refreshAuthState()
+    const onFocus = () => refreshAuthState()
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'auth_token') refreshAuthState()
+    }
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('storage', onStorage)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('storage', onStorage)
+    }
   }, [])
 
   useEffect(() => {

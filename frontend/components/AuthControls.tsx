@@ -27,76 +27,9 @@ export default function AuthControls() {
     init();
   }, []);
 
-  const handleAuth = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      if (isRegister) {
-        const res = await registerUser(email, password, fullName || undefined);
-        localStorage.setItem("auth_token", res.access_token);
-        setUser({
-          user_id: res.user_id,
-          email: res.email,
-          full_name: res.full_name,
-        });
-      } else {
-        const res = await loginUser(email, password);
-        localStorage.setItem("auth_token", res.access_token);
-        setUser({
-          user_id: res.user_id,
-          email: res.email,
-          full_name: res.full_name,
-        });
-      }
-    } catch (err: any) {
-      setError("Authentication failed. Check your credentials.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleLogout = () => {
     localStorage.removeItem("auth_token");
     setUser(null);
-  };
-
-  const handleRequestReset = async () => {
-    setLoading(true);
-    setResetInfo(null);
-    setError(null);
-    try {
-      const res = await requestPasswordReset(resetEmail);
-      if (res.reset_token) {
-        setResetToken(res.reset_token);
-        setResetInfo(
-          "Reset token generated (dev): copy it and set a new password below.",
-        );
-      } else {
-        setResetInfo(res.message);
-      }
-    } catch {
-      setError("Could not request password reset.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResetPassword = async () => {
-    setLoading(true);
-    setResetInfo(null);
-    setError(null);
-    try {
-      await resetPassword(resetToken, resetPasswordValue);
-      setResetInfo("Password reset successful. You can now log in.");
-      setShowReset(false);
-      setResetEmail("");
-      setResetToken("");
-      setResetPasswordValue("");
-    } catch {
-      setError("Password reset failed. Check the token and try again.");
-    } finally {
-      setLoading(false);
-    }
   };
 
   if (user) {
@@ -129,4 +62,4 @@ export default function AuthControls() {
       </Link>
     </div>
   );
-}
+ }
