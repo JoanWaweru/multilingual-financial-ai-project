@@ -36,7 +36,7 @@ export default function RegisterPage() {
           <h1 className="text-lg font-semibold text-gray-900">Create account</h1>
           <form onSubmit={handleSubmit} className="space-y-3 text-sm">
             <div className="space-y-1">
-              <label className="block text-gray-700">Full name (optional)</label>
+              <label className="block text-gray-700">Full name</label>
               <input
                 type="text"
                 value={fullName}
