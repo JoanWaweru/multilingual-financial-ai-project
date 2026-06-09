@@ -18,6 +18,7 @@ from app.services.auth_service import (
     reset_password_with_token,
     verify_password
 )
+from app.services.memory_service import memory_service
 
 router = APIRouter()
 
@@ -97,6 +98,25 @@ async def me(current_user=Depends(get_current_user)):
         "full_name": current_user.full_name,
         "role": current_user.role
     }
+
+
+class LinkSessionRequest(BaseModel):
+    session_id: str
+
+
+@router.post("/link-session")
+async def link_session(
+    request: LinkSessionRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Merge guest browser-session chats into the authenticated account."""
+    result = await memory_service.claim_guest_session(
+        current_user.id,
+        request.session_id,
+        db,
+    )
+    return result
 
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)

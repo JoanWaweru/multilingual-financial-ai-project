@@ -3,6 +3,7 @@ Memory service for managing chat history and user preferences
 """
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
+from sqlalchemy.exc import IntegrityError
 from typing import List, Dict, Optional
 from app.models.user import User
 from app.models.chat_history import ChatHistory
@@ -284,6 +285,52 @@ class MemoryService:
             delete(UserPreferences).where(UserPreferences.user_id == user_id)
         )
         await db.commit()
+
+    async def claim_guest_session(
+        self,
+        authenticated_user_id: str,
+        browser_session_id: str,
+        db: AsyncSession
+    ) -> Dict:
+        """
+        Attach anonymous browser-session chats to the logged-in account.
+        Guest users are created with User.session_id == browser session UUID.
+        """
+        result = await db.execute(
+            select(User).where(User.session_id == browser_session_id)
+        )
+        guest_user = result.scalar_one_or_none()
+
+        if not guest_user or guest_user.id == authenticated_user_id:
+            return {"merged": False, "reason": "nothing_to_merge"}
+
+        if guest_user.email:
+            return {"merged": False, "reason": "session_owned_by_other_account"}
+
+        await db.execute(
+            update(ChatHistory)
+            .where(ChatHistory.user_id == guest_user.id)
+            .values(user_id=authenticated_user_id)
+        )
+        await db.execute(
+            update(ChatSession)
+            .where(ChatSession.user_id == guest_user.id)
+            .values(user_id=authenticated_user_id)
+        )
+        await db.execute(
+            update(UserPreferences)
+            .where(UserPreferences.user_id == guest_user.id)
+            .values(user_id=authenticated_user_id)
+        )
+
+        try:
+            await db.execute(delete(User).where(User.id == guest_user.id))
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            await db.commit()
+
+        return {"merged": True, "browser_session_id": browser_session_id}
 
 memory_service = MemoryService()
 

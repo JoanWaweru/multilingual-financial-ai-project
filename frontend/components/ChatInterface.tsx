@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Send, Trash2, Loader2, Plus, Pin, PinOff, Trash, X } from 'lucide-react'
 import MessageBubble from './MessageBubble'
 import { sendMessage, clearChat, getChatHistory, getChatSessions, renameChat, pinChat, deleteChat, getMe } from '@/lib/api'
+import { isUnauthorizedError, syncGuestSessionAfterAuth } from '@/lib/auth-session'
 
 const GUEST_SESSIONS_KEY = 'kfa_guest_sessions'
 
@@ -77,10 +78,13 @@ export default function ChatInterface() {
     }
     try {
       await getMe()
+      await syncGuestSessionAfterAuth()
       setIsGuest(false)
-    } catch {
+    } catch (error) {
       setIsGuest(true)
-      window.localStorage.removeItem('auth_token')
+      if (isUnauthorizedError(error)) {
+        window.localStorage.removeItem('auth_token')
+      }
     }
   }
 

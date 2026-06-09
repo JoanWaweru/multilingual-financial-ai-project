@@ -94,6 +94,16 @@ export async function getPreferences(sessionId: string) {
   return response.data
 }
 
+export async function getMyPreferences() {
+  const response = await api.get('/api/memory/preferences/me')
+  return response.data
+}
+
+export async function linkGuestSession(sessionId: string) {
+  const response = await api.post('/api/auth/link-session', { session_id: sessionId })
+  return response.data
+}
+
 export interface AuthResponse {
   access_token: string
   token_type: string

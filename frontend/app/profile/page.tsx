@@ -7,9 +7,10 @@ import {
   exportChat,
   getMe,
   renameChat,
-  getPreferences,
+  getMyPreferences,
   savePreference,
 } from '@/lib/api'
+import { isUnauthorizedError } from '@/lib/auth-session'
 
 interface SessionSummary {
   session_id: string
@@ -34,8 +35,25 @@ function formatPreferenceValue(value: unknown): string {
 }
 
 function getSessionId(): string {
-  if (typeof window === 'undefined') return 'profile'
-  return localStorage.getItem('kfa_session_id') || 'profile'
+  if (typeof window === 'undefined') return ''
+  return localStorage.getItem('kfa_session_id') || ''
+}
+
+function applyPreferences(
+  prefs: UserPreferences,
+  setters: {
+    setPreferences: (p: UserPreferences) => void
+    setGoals: (v: string) => void
+    setRiskLevel: (v: string) => void
+    setLanguage: (v: string) => void
+    setTimeHorizon: (v: string) => void
+  }
+) {
+  setters.setPreferences(prefs)
+  setters.setGoals(formatPreferenceValue(prefs.goals) === 'Not set' ? '' : formatPreferenceValue(prefs.goals))
+  setters.setRiskLevel(prefs.risk_level || '')
+  setters.setLanguage(prefs.language || '')
+  setters.setTimeHorizon(prefs.time_horizon || '')
 }
 
 export default function ProfilePage() {
@@ -47,38 +65,83 @@ export default function ProfilePage() {
   const [language, setLanguage] = useState('')
   const [timeHorizon, setTimeHorizon] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [sessionsError, setSessionsError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
 
   useEffect(() => {
+    let cancelled = false
+
     const load = async () => {
+      setLoading(true)
+      setError(null)
+      setSessionsError(null)
+
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        setError('Please log in to view your profile and chats.')
+        setLoading(false)
+        return
+      }
+
       try {
         const meData = await getMe()
-        const sessionData = await getChatSessions()
-        const prefsData = await getPreferences(getSessionId())
-
-        const prefs: UserPreferences = prefsData.preferences || {}
+        if (cancelled) return
         setMe(meData)
-        setSessions(sessionData.sessions || [])
-        setPreferences(prefs)
-        setGoals(formatPreferenceValue(prefs.goals) === 'Not set' ? '' : formatPreferenceValue(prefs.goals))
-        setRiskLevel(prefs.risk_level || '')
-        setLanguage(prefs.language || '')
-        setTimeHorizon(prefs.time_horizon || '')
-      } catch {
+      } catch (err) {
+        if (cancelled) return
+        if (isUnauthorizedError(err)) {
+          localStorage.removeItem('auth_token')
+        }
         setError('Please log in to view your profile and chats.')
+        setLoading(false)
+        return
       }
+
+      const [sessionsResult, prefsResult] = await Promise.allSettled([
+        getChatSessions(),
+        getMyPreferences(),
+      ])
+
+      if (cancelled) return
+
+      if (sessionsResult.status === 'fulfilled') {
+        setSessions(sessionsResult.value.sessions || [])
+      } else {
+        console.error('Failed to load chat sessions', sessionsResult.reason)
+        setSessions([])
+        setSessionsError('Could not load your saved chats right now.')
+      }
+
+      if (prefsResult.status === 'fulfilled') {
+        applyPreferences(prefsResult.value.preferences || {}, {
+          setPreferences,
+          setGoals,
+          setRiskLevel,
+          setLanguage,
+          setTimeHorizon,
+        })
+      } else {
+        console.error('Failed to load preferences', prefsResult.reason)
+      }
+
+      setLoading(false)
     }
+
     load()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const handleSavePreferences = async () => {
     setSaving(true)
     setSaveMessage(null)
     try {
-      const sessionId = getSessionId()
+      const sessionId = getSessionId() || 'profile'
       await savePreference(sessionId, 'goals', goals.trim())
       await savePreference(sessionId, 'risk_level', riskLevel)
       await savePreference(sessionId, 'language', language)
@@ -86,8 +149,14 @@ export default function ProfilePage() {
         await savePreference(sessionId, 'time_horizon', timeHorizon.trim())
       }
 
-      const prefsData = await getPreferences(sessionId)
-      setPreferences(prefsData.preferences || {})
+      const prefsData = await getMyPreferences()
+      applyPreferences(prefsData.preferences || {}, {
+        setPreferences,
+        setGoals,
+        setRiskLevel,
+        setLanguage,
+        setTimeHorizon,
+      })
       setSaveMessage('Financial profile saved. The advisor will use these in future chats.')
     } catch {
       setSaveMessage('Could not save your profile. Please try again.')
@@ -105,9 +174,13 @@ export default function ProfilePage() {
           Your account, financial preferences, and chat history.
         </p>
 
-        {error && <div className="mt-4 text-sm text-gray-600">{error}</div>}
+      {loading && (
+        <div className="mt-4 text-sm text-gray-600">Loading your profile...</div>
+      )}
 
-        {!error && (
+      {error && !loading && <div className="mt-4 text-sm text-gray-600">{error}</div>}
+
+      {!error && !loading && (
           <div className="mt-6 space-y-6">
             <div className="rounded border border-gray-200 p-4 bg-white">
               <div className="text-sm text-gray-600">Email</div>
@@ -217,9 +290,14 @@ export default function ProfilePage() {
 
             <div className="rounded border border-gray-200 p-4 bg-white">
               <div className="font-medium">My Chats</div>
+              {sessionsError && (
+                <p className="text-sm text-amber-700 mt-2">{sessionsError}</p>
+              )}
               <div className="mt-3 space-y-3">
                 {sessions.length === 0 && (
-                  <div className="text-sm text-gray-600">No sessions found.</div>
+                  <div className="text-sm text-gray-600">
+                    No saved chats yet. Start a conversation on the home page while logged in.
+                  </div>
                 )}
                 {sessions.map((session) => (
                   <div key={session.session_id} className="border border-gray-200 rounded p-3">

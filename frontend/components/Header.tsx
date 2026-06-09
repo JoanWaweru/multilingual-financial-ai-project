@@ -6,6 +6,7 @@ import { Wallet, Globe } from 'lucide-react'
 import AuthControls from './AuthControls'
 import { getMe } from '@/lib/api'
 import { isStaffRole } from '@/lib/roles'
+import { isUnauthorizedError } from '@/lib/auth-session'
 
 type UserInfo = {
   role?: string
@@ -25,8 +26,10 @@ export default function Header() {
       try {
         const me = await getMe()
         setUser(me)
-      } catch {
-        localStorage.removeItem('auth_token')
+      } catch (error) {
+        if (isUnauthorizedError(error)) {
+          localStorage.removeItem('auth_token')
+        }
         setUser(null)
       }
     }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getMe } from "@/lib/api";
+import { isUnauthorizedError } from "@/lib/auth-session";
 
 interface UserInfo {
   user_id: string;
@@ -20,8 +21,10 @@ export default function AuthControls() {
       try {
         const me = await getMe();
         setUser(me);
-      } catch {
-        localStorage.removeItem("auth_token");
+      } catch (error) {
+        if (isUnauthorizedError(error)) {
+          localStorage.removeItem("auth_token");
+        }
       }
     };
     init();

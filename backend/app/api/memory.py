@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.services.memory_service import memory_service
-from app.services.auth_service import get_current_user_optional
+from app.services.auth_service import get_current_user_optional, get_current_user
 
 router = APIRouter()
 
@@ -41,6 +41,19 @@ async def save_preference(
         return {"status": "success", "message": f"Preference '{request.key}' saved"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/preferences/me")
+async def get_my_preferences(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Get preferences for the logged-in user (no session id required)."""
+    try:
+        preferences = await memory_service.get_user_preferences(current_user.id, db=db)
+        return {"preferences": preferences}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/preferences/{session_id}")
 async def get_preferences(

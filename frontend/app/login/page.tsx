@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/Header'
 import { loginUser } from '@/lib/api'
+import { syncGuestSessionAfterAuth } from '@/lib/auth-session'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -19,6 +20,7 @@ export default function LoginPage() {
     try {
       const res = await loginUser(email, password)
       localStorage.setItem('auth_token', res.access_token)
+      await syncGuestSessionAfterAuth()
       router.push('/')
     } catch (err) {
       setError('Login failed. Check your email and password.')

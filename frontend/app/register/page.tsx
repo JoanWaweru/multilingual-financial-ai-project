@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/Header'
 import { registerUser } from '@/lib/api'
+import { syncGuestSessionAfterAuth } from '@/lib/auth-session'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -20,6 +21,7 @@ export default function RegisterPage() {
     try {
       const res = await registerUser(email, password, fullName || undefined)
       localStorage.setItem('auth_token', res.access_token)
+      await syncGuestSessionAfterAuth()
       router.push('/')
     } catch (err) {
       setError('Registration failed. Please check your details and try again.')
