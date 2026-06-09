@@ -1,38 +1,70 @@
-# Environment
-.env
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 venv/
 env/
 ENV/
+.venv
+backend/venv/
+*.egg-info/
+dist/
+build/
 *.pyc
-__pycache__/
 
-# Data files (too large)
+# Node / Next.js
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+out/
+.npm
+.eslintcache
+
+# Environment
+.env
+.env.local
+.env*.local
+backend/.env
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+database/
+backend/database/
+
+# Vector store (built at ingest; keep sample docs in repo)
+data/vector_store/
+backend/data/vector_store/
+*.index
+
+# Thesis data & models (large files)
 data/raw/
 data/processed/
 data/annotations/
 data/splits/
-
-# Models (too large)
 saved_models/*.pt
 saved_models/*.pkl
 saved_models/*.pth
 
-# Logs
+# Logs & results
 logs/
 *.log
+results/
 
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb_checkpoints
-
-# Results
-results/
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store
