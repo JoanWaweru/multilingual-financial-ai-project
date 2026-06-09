@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { Wallet, Globe } from 'lucide-react'
 import AuthControls from './AuthControls'
 import { getMe } from '@/lib/api'
+import { isStaffRole } from '@/lib/roles'
 
 type UserInfo = {
   role?: string
@@ -53,9 +54,12 @@ export default function Header() {
               <span>English / Kiswahili</span>
             </div>
             <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600">
-              <Link href="/profile" className="hover:text-gray-900">My Profile</Link>
-              <Link href="/documents" className="hover:text-gray-900">Documents</Link>
-              <Link href="/evaluation" className="hover:text-gray-900">Evaluation</Link>
+              {user && (
+                <Link href="/profile" className="hover:text-gray-900">My Profile</Link>
+              )}
+              {isStaffRole(user?.role) && (
+                <Link href="/documents" className="hover:text-gray-900">Documents</Link>
+              )}
               {user?.role === 'admin' && (
                 <Link href="/admin" className="hover:text-gray-900">Admin</Link>
               )}
