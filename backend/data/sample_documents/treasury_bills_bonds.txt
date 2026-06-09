@@ -1,0 +1,36 @@
+TREASURY BILLS AND BONDS IN KENYA
+
+Government securities issued by the Central Bank of Kenya on behalf of the Government of Kenya.
+
+1. TREASURY BILLS (T-BILLS)
+- Short-term securities with maturities of 91, 182, or 364 days
+- Sold at a discount and redeemed at face value
+- Interest is the difference between purchase price and face value
+- Minimum investment: KES 50,000
+- Auctioned weekly by CBK
+- No secondary market trading
+
+2. TREASURY BONDS
+- Long-term securities with maturities of 2, 5, 10, 15, 20, or 25 years
+- Pay semi-annual coupon payments
+- Can be traded on the secondary market (NSE)
+- Minimum investment: KES 100,000
+- Interest rates determined by auction
+
+3. HOW TO INVEST
+- Open a CDS account (same as for stocks)
+- Participate in primary auctions through your broker
+- Or buy from secondary market on NSE
+- Interest income is tax-exempt for individuals
+
+4. RISKS
+- Low risk: Backed by Government of Kenya
+- Interest rate risk: Bond prices fall when rates rise
+- Inflation risk: Returns may not keep pace with inflation
+- Liquidity: T-Bills are held to maturity; Bonds can be sold on secondary market
+
+5. RETURNS
+- T-Bill rates: Typically 8-12% per annum
+- Bond yields: Vary by maturity, typically 10-15% per annum
+- Tax-free for individual investors
+- Considered one of the safest investments in Kenya

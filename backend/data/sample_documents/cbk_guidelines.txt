@@ -1,0 +1,27 @@
+CENTRAL BANK OF KENYA (CBK) GUIDELINES FOR PERSONAL FINANCE
+
+The Central Bank of Kenya is the primary regulator of the banking sector in Kenya. 
+Key regulations affecting personal finance include:
+
+1. BANKING SERVICES
+- All commercial banks in Kenya are licensed and regulated by CBK
+- Deposit Protection Fund (DPF) insures deposits up to KES 500,000 per depositor per bank
+- Interest rates on loans are regulated, with banks required to disclose Annual Percentage Rate (APR)
+- Mobile banking services (M-Pesa, Airtel Money) are regulated by CBK
+
+2. SAVINGS AND INVESTMENTS
+- Commercial banks offer savings accounts with interest rates typically ranging from 3-7% per annum
+- Fixed deposit accounts offer higher rates for longer terms (1-5 years)
+- Money Market Funds (MMFs) are regulated by the Capital Markets Authority (CMA)
+- Treasury Bills and Bonds are issued by the Government of Kenya through CBK
+
+3. LOANS AND CREDIT
+- CBK maintains a Credit Reference Bureau (CRB) system
+- All loans must be registered with CRB
+- Maximum interest rates are capped by law
+- Borrowers should check their credit scores before applying for loans
+
+4. CONSUMER PROTECTION
+- CBK requires banks to provide clear information about fees and charges
+- Customers have the right to file complaints with CBK
+- Banks must provide statements and account information upon request
